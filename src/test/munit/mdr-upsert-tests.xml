@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:mock="http://www.mulesoft.org/schema/mule/mock"
+      xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+      xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:spring="http://www.springframework.org/schema/beans"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.mulesoft.org/schema/mule/mock http://www.mulesoft.org/schema/mule/mock/current/mule-mock.xsd
+http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd">
+    <munit:config name="munit" doc:name="MUnit configuration"/>
+
+    <spring:beans>
+        <spring:import resource="classpath:mdr-upserts.xml"/>
+        <spring:import resource="classpath:globals.xml"/>
+    </spring:beans>
+
+    <munit:test name="upsertProjCanHandleEmptyResult" description="Test">
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:then-return payload="[ ]" mimeType="application/json"/>
+        </mock:when>
+
+        <set-variable variableName="theProject" value="{ &quot;projectSfdcId&quot; :  &quot;SF1&quot;}" mimeType="application/json" doc:name="Variable"/>
+
+        <flow-ref name="upsertPROJ:SF_PROJ" doc:name="upsertPROJ:SF_PROJ"/>
+
+        <munit:assert-on-equals message="payload should be an empty list" expectedValue="#[0]" actualValue="#[payload.size()]" doc:name="Assert Equals"/>
+    </munit:test>
+
+    <munit:test name="upsertOrgCanHandleEmptyResult" description="Test">
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:then-return payload="[ ]" mimeType="application/json"/>
+        </mock:when>
+
+        <set-variable variableName="theProject" value="{ &quot;projectSfdcId&quot; :  &quot;SF1&quot;}" mimeType="application/json" doc:name="Variable"/>
+
+        <flow-ref name="upsertORG:SF_BILLCO" doc:name="upsertORG:SF_BILLCO"/>
+
+        <munit:assert-on-equals message="payload should be an empty list" expectedValue="#[0]" actualValue="#[payload.size()]" doc:name="Assert Equals"/>
+    </munit:test>
+
+    <munit:test name="upsertOrgAddrCanHandleEmptyResult" description="Test">
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:then-return payload="[ ]" mimeType="application/json"/>
+        </mock:when>
+
+        <set-variable variableName="theProject" value="{ &quot;projectSfdcId&quot; :  &quot;SF1&quot;}" mimeType="application/json" doc:name="Variable"/>
+
+        <flow-ref name="upsertORGADDR:SF_BILLADDR" doc:name="upsertORGADDR:SF_BILLADDR"/>
+
+        <munit:assert-on-equals message="payload should be an empty list" expectedValue="#[0]" actualValue="#[payload.size()]" doc:name="Assert Equals"/>
+    </munit:test>
+</mule>

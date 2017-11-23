@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:spring="http://www.springframework.org/schema/beans" xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:json="http://www.mulesoft.org/schema/mule/json"
+      xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+      xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+      xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    <flow name="runNewlyActiveProjects" processingStrategy="synchronous" >
+        
+                <logger message="system=SFDC action=request method=NewlyActiveProjects" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+                <sfdc:query config-ref="Salesforce__Basic_Authentication" query="${main.sfdc.query} WHERE (Project_Status__c = '${aria.project_status.active}' AND Active_Date__c = #[server.dateTime.plusDays(-1).format('yyyy-MM-dd')]) OR 
+(Project_Status__c = '${aria.project_status.closed}' AND Closed_Date__c = #[server.dateTime.plusDays(-1).format('yyyy-MM-dd')])" doc:name="Salesforce"/>
+
+                <logger message="system=SFDC action=response method=NewlyActiveProjects" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+             
+        <foreach doc:name="For Each">
+            <json:object-to-json-transformer mimeType="application/json" doc:name="Object to JSON"/>
+            <vm:outbound-endpoint exchange-pattern="request-response" path="VM_MAP_SFDC_PROJECT" connector-ref="VM_IN_MEMORY" doc:name="vmMapMerrillProject"/>
+
+            <flow-ref name="processNewlyActiveProject" doc:name="processNewlyActiveProject"/>
+        </foreach>
+        <flow-ref name="SET_HTTP_Response" doc:name="SET_HTTP_Response"/>
+
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="flow=#[flow.name] exception=#[exception.getSummaryMessage()]" level="ERROR" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        </catch-exception-strategy>
+    </flow>
+</mule>

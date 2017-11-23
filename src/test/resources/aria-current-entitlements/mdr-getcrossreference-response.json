@@ -1,0 +1,11 @@
+[
+  {
+    "STARTDATE": "2016-11-20T00:00:00",
+    "IdentifierValue": "some-aria-mpi",
+    "EntityTypeKey": "PROJ",
+    "ISDELETED": 0,
+    "IdentifierTypeKey": "Aria_MPI",
+    "Qualifier1Key": "Aria_ACCT",
+    "Qualifier1Value": "aria-acct-id"
+  }
+]

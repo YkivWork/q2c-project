@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns1="urn:client:api:wsdl:document/literal_wrapped:vers:11.0:aria_complete_m_api" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <SOAP-ENV:Body>
+    <ns1:update_acct_plan_multi_mResponseElement>
+      <ns1:error_code>0</ns1:error_code>
+      <ns1:error_msg>OK</ns1:error_msg>
+      <ns1:out_acct_no>1781616</ns1:out_acct_no>
+      <ns1:out_client_acct_id xsi:nil="true"/>
+      <ns1:billing_errors>
+        <ns1:invoicing_error_code xsi:nil="true"/>
+        <ns1:invoicing_error_msg xsi:nil="true"/>
+        <ns1:collection_error_code>-1</ns1:collection_error_code>
+        <ns1:collection_error_msg>not attempted</ns1:collection_error_msg>
+        <ns1:statement_error_code>-1</ns1:statement_error_code>
+        <ns1:statement_error_msg>not attempted</ns1:statement_error_msg>
+        <ns1:billing_group_no>1130054</ns1:billing_group_no>
+        <ns1:client_billing_group_id>1130054</ns1:client_billing_group_id>
+      </ns1:billing_errors>
+      <ns1:plans_updated>
+        <ns1:plan_instance_no>2460102</ns1:plan_instance_no>
+        <ns1:client_plan_instance_id>2460102</ns1:client_plan_instance_id>
+        <ns1:plan_no>32544</ns1:plan_no>
+        <ns1:client_plan_id>DataSite</ns1:client_plan_id>
+        <ns1:plan_name>DataSite</ns1:plan_name>
+        <ns1:plan_operation>1</ns1:plan_operation>
+      </ns1:plans_updated>
+      <ns1:plans_updated>
+        <ns1:plan_instance_no>2460103</ns1:plan_instance_no>
+        <ns1:client_plan_instance_id>2460103</ns1:client_plan_instance_id>
+        <ns1:plan_no>38794</ns1:plan_no>
+        <ns1:client_plan_id>Special_Media</ns1:client_plan_id>
+        <ns1:plan_name>Special Media</ns1:plan_name>
+        <ns1:plan_operation>1</ns1:plan_operation>
+      </ns1:plans_updated>
+      <ns1:plans_updated>
+        <ns1:plan_instance_no>2460104</ns1:plan_instance_no>
+        <ns1:client_plan_instance_id>2460104</ns1:client_plan_instance_id>
+        <ns1:plan_no>77284</ns1:plan_no>
+        <ns1:client_plan_id>Special_Media_Hosted</ns1:client_plan_id>
+        <ns1:plan_name>Special Media Hosted</ns1:plan_name>
+        <ns1:plan_operation>1</ns1:plan_operation>
+      </ns1:plans_updated>
+      <ns1:plans_updated>
+        <ns1:plan_instance_no>2460105</ns1:plan_instance_no>
+        <ns1:client_plan_instance_id>2460105</ns1:client_plan_instance_id>
+        <ns1:plan_no>38778</ns1:plan_no>
+        <ns1:client_plan_id>Pages_Uploaded</ns1:client_plan_id>
+        <ns1:plan_name>Pages Uploaded</ns1:plan_name>
+        <ns1:plan_operation>1</ns1:plan_operation>
+      </ns1:plans_updated>
+      <ns1:plans_updated>
+        <ns1:plan_instance_no>2460106</ns1:plan_instance_no>
+        <ns1:client_plan_instance_id>2460106</ns1:client_plan_instance_id>
+        <ns1:plan_no>38791</ns1:plan_no>
+        <ns1:client_plan_id>MBs_Uploaded</ns1:client_plan_id>
+        <ns1:plan_name>MBs Uploaded</ns1:plan_name>
+        <ns1:plan_operation>1</ns1:plan_operation>
+      </ns1:plans_updated>
+      <ns1:plans_updated>
+        <ns1:plan_instance_no>2460107</ns1:plan_instance_no>
+        <ns1:client_plan_instance_id>2460107</ns1:client_plan_instance_id>
+        <ns1:plan_no>38789</ns1:plan_no>
+        <ns1:client_plan_id>GBs_Uploaded</ns1:client_plan_id>
+        <ns1:plan_name>GBs Uploaded</ns1:plan_name>
+        <ns1:plan_operation>1</ns1:plan_operation>
+      </ns1:plans_updated>
+      <ns1:plans_updated>
+        <ns1:plan_instance_no>2460108</ns1:plan_instance_no>
+        <ns1:client_plan_instance_id>2460108</ns1:client_plan_instance_id>
+        <ns1:plan_no>38786</ns1:plan_no>
+        <ns1:client_plan_id>Pages_Hosted</ns1:client_plan_id>
+        <ns1:plan_name>Pages Hosted</ns1:plan_name>
+        <ns1:plan_operation>1</ns1:plan_operation>
+      </ns1:plans_updated>
+      <ns1:plans_updated>
+        <ns1:plan_instance_no>2460109</ns1:plan_instance_no>
+        <ns1:client_plan_instance_id>2460109</ns1:client_plan_instance_id>
+        <ns1:plan_no>38792</ns1:plan_no>
+        <ns1:client_plan_id>MBs_Hosted</ns1:client_plan_id>
+        <ns1:plan_name>MBs Hosted</ns1:plan_name>
+        <ns1:plan_operation>1</ns1:plan_operation>
+      </ns1:plans_updated>
+      <ns1:plans_updated>
+        <ns1:plan_instance_no>2460110</ns1:plan_instance_no>
+        <ns1:client_plan_instance_id>2460110</ns1:client_plan_instance_id>
+        <ns1:plan_no>38790</ns1:plan_no>
+        <ns1:client_plan_id>GBs_Hosted</ns1:client_plan_id>
+        <ns1:plan_name>GBs Hosted</ns1:plan_name>
+        <ns1:plan_operation>1</ns1:plan_operation>
+      </ns1:plans_updated>
+      <ns1:billing_groups_updated>
+        <ns1:billing_group_no>1130054</ns1:billing_group_no>
+        <ns1:client_billing_groups_id>1130054</ns1:client_billing_groups_id>
+        <ns1:primary_payment_method_no xsi:nil="true"/>
+        <ns1:primary_client_payment_method_id xsi:nil="true"/>
+        <ns1:backup_payment_method_no xsi:nil="true"/>
+        <ns1:backup_client_payment_method_id xsi:nil="true"/>
+        <ns1:billing_group_operation xsi:nil="true"/>
+      </ns1:billing_groups_updated>
+      <ns1:statement_contact_details>
+        <ns1:billing_group_no>1130054</ns1:billing_group_no>
+        <ns1:stmt_contact_no>4623733</ns1:stmt_contact_no>
+      </ns1:statement_contact_details>
+    </ns1:update_acct_plan_multi_mResponseElement>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

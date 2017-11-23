@@ -1,0 +1,269 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking"
+xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting"
+xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+xmlns:http="http://www.mulesoft.org/schema/mule/http"
+xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+xmlns:spring="http://www.springframework.org/schema/beans"
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+
+    <sub-flow name="persistInDSOFlow">
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="varDSOXrefExistsFlag"><![CDATA[%dw 1.0
+%output application/java
+
+%var varDSOXrefExistsFlag = flowVars.upsertSfdcProjResponse[?( $.IdentifierTypeKey == 'DS1_Proj' and $.EntityTypeKey == 'PROJ' )][0]
+
+---
+true when varDSOXrefExistsFlag != null otherwise false
+]]></dw:set-variable>
+        </dw:transform-message>
+        <set-variable variableName="varSfdcDSOProjectID" value="#[flowVars.theProject.datasiteOneId]" doc:name="varSfdcDSOProjectID"/>
+
+        <choice doc:name="Choice-DSOXREF, DSOPROJ">
+            <when expression="#[(flowVars.varDSOXrefExistsFlag == true) &amp;&amp; (flowVars.varSfdcDSOProjectID != empty)]">
+                <logger message="{DSOXREF:Y, DSOPROJ:Y}: {UpdateDSOProject: Y, CreateDSOXref: N}" level="INFO" doc:name="Cond1-{DSOXREF Y, DSOPROJ Y}"/>
+                <flow-ref name="updateInDSOFlow" doc:name="updateInDSOFlow"/>
+            </when>
+            <when expression="#[(flowVars.varDSOXrefExistsFlag == false) &amp;&amp; (flowVars.varSfdcDSOProjectID == empty)]">
+                <logger message="{DSOXREF:N, DSOPROJ:N}: {CreateDSOProject: Y, CreateDSOXref: Y}" level="INFO" doc:name="Cond2-{DSOXREF N, DSOPROJ N}"/>
+                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-variable variableName="ariaValues"><![CDATA[%dw 1.0
+%output application/java
+
+%var currency = log('Looking for currency: ', flowVars.theProject.currency)
+%var legalEntity = log('Looking for legalEntity: ', flowVars.theProject.legalEntity)
+
+%var ariaFoundResults = flowVars.upsertOrgResponse[?(
+  $.Qualifier1Key == 'CURRENCY' and $.Qualifier1Value == currency and
+  $.Qualifier2Key == 'LEGALENT' and $.Qualifier2Value == legalEntity
+)] default []
+
+%var ariaAcct = ariaFoundResults[0].IdentifierValue
+
+%var ariaMpi = flowVars.upsertSfdcProjResponse[?(
+ $.Qualifier1Key == 'ARIAACCT' and
+ $.EntityTypeKey == 'PROJ' and
+ $.Qualifier1Value == ariaAcct)][0].IdentifierValue when ( ariaAcct != null ) otherwise null
+---
+{
+  ariaAcct: ariaAcct,
+  ariaMPI: ariaMpi
+}
+]]></dw:set-variable>
+                </dw:transform-message>
+                <enricher target="variable:ariaAcctDetails" doc:name="Message Enricher">
+                    <flow-ref name="getAriaAcctDetailsFlow" doc:name="getAriaAcctDetailsFlow"/>
+                </enricher>
+                <flow-ref name="createInDSOFlow" doc:name="createInDSOFlow"/>
+                <flow-ref name="createDSOXRefs" doc:name="createDSOXRefs"/>
+            </when>
+            <when expression="#[(flowVars.varDSOXrefExistsFlag == false) &amp;&amp; (flowVars.varSfdcDSOProjectID != empty)]">
+                <logger message="{DSOXREF:N, DSOPROJ:Y}: {CreateDSOXref: Y, UpdateDSOProject: Y}" level="INFO" doc:name="Cond3-{DSOXREF N, DSOPROJ Y}"/>             
+                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-variable variableName="DSOCreateProjectResponse"><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	id: flowVars.varSfdcDSOProjectID
+}]]></dw:set-variable>
+                </dw:transform-message>
+                <flow-ref name="createDSOXRefs" doc:name="createDSOXRefs"/>
+                <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="upsertSfdcProjResponse"><![CDATA[%dw 1.0
+%output application/json
+---
+[
+{
+    "STARTDATE": "2017-05-15T16:55:39",
+    "IdentifierValue": flowVars.varSfdcDSOProjectID,
+    "EntityTypeKey": "PROJ",
+    "ENDDATE": null,
+    "Qualifier2Key": null,
+    "ISDELETED": 0,
+    "Qualifier2Value": null,
+    "IdentifierTypeKey": "DS1_Proj",
+    "Qualifier1Key": null,
+    "Qualifier1Value": null
+  }
+  ]]]></dw:set-variable>
+        </dw:transform-message>
+                <flow-ref name="updateInDSOFlow" doc:name="updateInDSOFlow"/>
+            </when>
+  <!--            <when expression="#[flowVars.needsDS1Update]">
+                <flow-ref name="updateInDSOFlow" doc:name="updateInDSOFlow"/>
+            </when>-->
+            <otherwise>
+                <logger message="{Default:Choice-DSOXREF, DSOPROJ} {Payload: #[payload]}" level="INFO" doc:name="Cond-Default"/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+
+    <sub-flow name="createInDSOFlow">
+        <flow-ref name="getDSOAuth_Sub_Flow" doc:name="getDSOAuth_Sub_Flow"/>
+        <logger message="flow=createInDSOFlow action=started projectId=#[flowVars.projectId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <enricher target="variable:ariaResponse" doc:name="Message Enricher">
+            <flow-ref name="parseAriaCurrentEntitlementAndStateForMPIFlow" doc:name="parseAriaCurrentEntitlementAndStateForMPIFlow"/>
+        </enricher>
+
+        <byte-array-to-object-transformer doc:name="Byte Array to Object"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+  info: {
+    name: flowVars.theProject.name,
+    description: flowVars.theProject.name,
+    externalId: flowVars.theProject.projectSfdcId,
+    dataCenter: flowVars.theProject.dataCenter,
+    productCode: "MANDA",
+	emailId: '${default.email.address}' when flowVars.theProject.adminEmail == null otherwise flowVars.theProject.adminEmail,
+    scheduledActivationDate: 0,
+    state: "PREP" when flowVars.ariaResponse.state == "Preparation" otherwise "ACTIVE" when flowVars.ariaResponse.state == "Active" otherwise "HIBERNATION" when flowVars.ariaResponse.state == "Hibernation" otherwise "SUSPENDED" when flowVars.ariaResponse.state == "Suspended" otherwise "CLOSED" when flowVars.ariaResponse.state == "Pending Close" otherwise "CLOSED" when flowVars.ariaResponse.state == "Closed" otherwise "UNKNOWN",
+    demo: false
+  },
+  deleted: false,
+  configurations: null,
+  entitlements: (flowVars.ariaResponse.entitlements default '' splitBy ";") map  {
+	"enabled": true,
+	"entitlementCode": trim $
+  }
+} ]]></dw:set-payload>
+        </dw:transform-message>
+
+        <logger message="system=DSO method=CreateProject action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <logger message="system=DSO method=CreateProject action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="setPayloadBeforeUntilSuccess"/>
+        <until-successful maxRetries="${dso.http.max.retries}" doc:name="Until Successful" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" millisBetweenRetries="${dso.http.milliSecondsBetweenRetries}">
+            <http:request config-ref="dsoApiRequestConfiguration" path="${dso.create.api.path}" method="POST" doc:name="DSO_CreateProject">
+                <http:request-builder>
+                    <http:header headerName="Content-Type" value="application/json"/>
+                    <http:header headerName="Authorization" value="Bearer #[flowVars.dsoToken]"/>
+           </http:request-builder>
+            </http:request>
+        </until-successful>
+
+        <logger message="system=DSO method=CreateProject action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <logger message="system=DSO method=CreateProject action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[payload]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="DSOCreateProjectResponse"><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-variable>
+        </dw:transform-message>
+
+        <flow-ref name="createPROJ:DS1_PROJ" doc:name="createPROJ:DS1_PROJ"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+[{
+  Id: flowVars.theProject.projectSfdcId,
+  DatasiteOne_ProjectID__c: flowVars.DSOCreateProjectResponse.id
+}]]]></dw:set-payload>
+        </dw:transform-message>
+
+        <sfdc:update config-ref="Salesforce__Basic_Authentication" type="DatasiteOne_Project__c" doc:name="Salesforce"/>
+<!-- FIXME Check SFDC result -->
+
+        <logger message="flow=createInDSOFlow action=completed projectId=#[flowVars.projectId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+    </sub-flow>
+
+    <sub-flow name="createDSOXRefs">
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+  entity_type_key: "PROJ",
+  on_id_type_key: "SF_PROJ",
+  on_id_value: flowVars.theProject.projectSfdcId,
+  add_id_type_key: "DS1_Proj",
+  add_id_value: flowVars.DSOCreateProjectResponse.id
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <logger message="system=MDR method=SF_PROJ:DS1_Proj action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <logger message="system=MDR method=SF_PROJ:DS1_Proj action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="setPayloadBeforeUntilSuccess"/>
+        <until-successful maxRetries="${mdr.http.max.retries}" doc:name="Until Successful" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" millisBetweenRetries="${mdr.http.milliSecondsBetweenRetries}">
+            <http:request config-ref="mdrSystemRequestConfiguration" path="${mdr.crossref.path}" method="POST" doc:name="Post MDR XRef"/>
+        </until-successful>
+
+        <logger message="system=MDR method=SF_PROJ:DS1_Proj action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+    </sub-flow>
+
+    <sub-flow name="updateInDSOFlow">
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="dsoProjectId"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.upsertSfdcProjResponse[?( $.IdentifierTypeKey == 'DS1_Proj' and $.EntityTypeKey == 'PROJ' )][0].IdentifierValue
+]]></dw:set-variable>
+        </dw:transform-message>
+
+        <flow-ref name="getDSOAuth_Sub_Flow" doc:name="getDSOAuth_Sub_Flow"/>
+
+        <enricher target="variable:ariaResponse" doc:name="Message Enricher">
+            <flow-ref name="parseAriaCurrentEntitlementAndStateForMPIFlow" doc:name="parseAriaCurrentEntitlementAndStateForMPIFlow"/>
+        </enricher>
+
+        <dw:transform-message doc:name="Prepare Payload For Dso Entitlement Update">
+            <dw:set-payload resource="classpath:dataweave/prepareUpdateDsoEntitlementPayload.dwl"/>
+        </dw:transform-message>
+
+        <logger message="system=DSO method=UpdateProjectEntitlements action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <logger message="system=DSO method=UpdateProjectEntitlements action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="setPayloadBeforeUntilSuccess"/>
+        <until-successful maxRetries="${dso.http.max.retries}" doc:name="Until Successful" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" millisBetweenRetries="${dso.http.milliSecondsBetweenRetries}">
+            <http:request config-ref="dsoApiRequestConfiguration" path="${dso.create.api.path}/{projectId}/entitlements" method="PUT" doc:name="DSO_UpdateProject Entitlement">
+                <http:request-builder>
+                    <http:uri-param paramName="projectId" value="#[flowVars.dsoProjectId]"/>
+                    <http:header headerName="Content-Type" value="application/json"/>
+                    <http:header headerName="Authorization" value="Bearer #[flowVars.dsoToken]"/>
+                </http:request-builder>
+            </http:request>
+        </until-successful>
+
+        <logger message="system=DSO method=UpdateProjectEntitlements action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <logger message="system=DSO method=UpdateProjectEntitlements action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[payload]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <dw:transform-message doc:name="Prepare Payload For Dso Status Update">
+            <dw:set-payload resource="classpath:dataweave/prepareUpdateDsoStatePayload.dwl"/>
+        </dw:transform-message>
+ 
+        <logger message="system=DSO method=UpdateProject action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <logger message="system=DSO method=UpdateProject action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="setPayloadBeforeUntilSuccess"/>
+        <until-successful maxRetries="${dso.http.max.retries}" millisBetweenRetries="${dso.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful">
+            <http:request config-ref="dsoApiRequestConfiguration" path="${dso.create.api.path}/{projectId}/info" method="PUT" doc:name="DSO_UpdateProject State">
+                <http:request-builder>
+                    <http:uri-param paramName="projectId" value="#[flowVars.dsoProjectId]"/>
+                    <http:header headerName="Content-Type" value="application/json"/>
+                    <http:header headerName="Authorization" value="Bearer #[flowVars.dsoToken]"/>
+                </http:request-builder>
+            </http:request>
+        </until-successful>
+
+        <logger message="system=DSO method=UpdateProject action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <logger message="system=DSO method=UpdateProject action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[payload]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+    </sub-flow>
+</mule>

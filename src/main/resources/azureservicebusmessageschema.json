@@ -1,0 +1,73 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "definitions": {},
+    "id": "http://example.com/example.json",
+    "properties": {
+        "applicationProperties": {
+            "id": "/properties/applicationProperties",
+            "properties": {},
+            "type": "object"
+        },
+        "body": {
+            "id": "/properties/body",
+            "type": "string"
+        },
+        "header": {
+            "id": "/properties/header",
+            "properties": {
+                "deliveryCount": {
+                    "id": "/properties/header/properties/deliveryCount",
+                    "type": "integer"
+                },
+                "durable": {
+                    "id": "/properties/header/properties/durable",
+                    "type": "boolean"
+                },
+                "priority": {
+                    "id": "/properties/header/properties/priority",
+                    "type": "integer"
+                },
+                "ttl": {
+                    "id": "/properties/header/properties/ttl",
+                    "type": "null"
+                }
+            },
+            "type": "object"
+        },
+        "properties": {
+            "id": "/properties/properties",
+            "properties": {
+                "contentType": {
+                    "id": "/properties/properties/properties/contentType",
+                    "type": "null"
+                },
+                "correlationId": {
+                    "id": "/properties/properties/properties/correlationId",
+                    "type": "null"
+                },
+                "messageId": {
+                    "id": "/properties/properties/properties/messageId",
+                    "type": "string"
+                },
+                "replyTo": {
+                    "id": "/properties/properties/properties/replyTo",
+                    "type": "null"
+                },
+                "subject": {
+                    "id": "/properties/properties/properties/subject",
+                    "type": "null"
+                },
+                "to": {
+                    "id": "/properties/properties/properties/to",
+                    "type": "string"
+                },
+                "userId": {
+                    "id": "/properties/properties/properties/userId",
+                    "type": "null"
+                }
+            },
+            "type": "object"
+        }
+    },
+    "type": "object"
+}

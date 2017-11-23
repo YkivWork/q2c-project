@@ -1,0 +1,31 @@
+{
+  "OutputParameters" : {
+    "@xmlns:xsi" : "http://www.w3.org/2001/XMLSchema-instance",
+    "@xmlns" : "http://xmlns.oracle.com/apps/pa/rest/xxsp_mapping_svc/get_inv_template_mapping/",
+    "X_INV_TEMPL_MAP" : {
+      "X_INV_TEMPL_MAP_ITEM" : [ {
+        "BUSINESS_UNIT" : "DATASITE",
+        "COUNTRY_CODE" : "AD",
+        "STATEMENT_TEMPLATE" : "US Statement",
+        "CREDIT_NOTE_TEMPLATE" : "US Credit Note",
+        "CREDIT_MEMO_TEMPLATE" : "US Credit Memo",
+        "REBILL_TEMPLATE" : "US Statement"
+      }, {
+        "BUSINESS_UNIT" : "DATASITE",
+        "COUNTRY_CODE" : "AE",
+        "STATEMENT_TEMPLATE" : "US Statement",
+        "CREDIT_NOTE_TEMPLATE" : "US Statement",
+        "CREDIT_MEMO_TEMPLATE" : "US Statement",
+        "REBILL_TEMPLATE" : "US Statement"
+      }, {
+        "BUSINESS_UNIT" : "DATASITE",
+        "COUNTRY_CODE" : "US",
+        "STATEMENT_TEMPLATE" : 112,
+        "CREDIT_NOTE_TEMPLATE" : 113,
+        "CREDIT_MEMO_TEMPLATE" : 114,
+        "REBILL_TEMPLATE" : 115
+      }
+      ]
+   }
+  }
+ }

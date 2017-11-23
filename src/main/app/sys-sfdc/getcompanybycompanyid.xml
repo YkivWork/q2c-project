@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+	xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+
+    <flow name="GET_COMPANY_BY_COMPANY_ID" processingStrategy="synchronous">
+        <vm:inbound-endpoint exchange-pattern="request-response" path="VM_GET_COMPANY_BY_COMPANY_ID" connector-ref="VM_IN_MEMORY" doc:name="Get Company by Company Id"/>
+        <logger message="***Get Company By Company Id Initial Payload: #[message.payloadAs(java.lang.String)]" level="INFO" category="GET_COMPANY_BY_COMPANY_ID" doc:name="[DEBUG]Log Initial Payload"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <expression-component doc:name="Expression"><![CDATA[flowVars.companyId=payload.ParentId]]></expression-component>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select   DataSiteOne_Project__c from   DataSiteOne_Company__c where   id = '#[flowVars.companyId]' " doc:name="Salesforce"/>
+
+        <json:object-to-json-transformer mimeType="application/json" doc:name="Object to JSON"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="projectResult"><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-variable>
+
+
+        </dw:transform-message>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select  DatasiteOne_Project__c  from  DatasiteOne_Company__c where  DatasiteOne_Project__c = '#[flowVars.projectResult[0].DatasiteOne_Project__c]'  and Billing_Split__c &lt;&gt; null  and Billing_Split__c &gt; 0" doc:name="Salesforce"/>
+        <json:object-to-json-transformer mimeType="application/json" doc:name="Object to JSON"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="***Get Company By Company Id: #[message.payloadAs(java.lang.String)]" level="INFO" doc:name="Logger" category="getCompanyByCompanyId		"/>        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="Exception Summary: #[exception.getSummaryMessage()]" level="ERROR" category="getCompanyByCompanyId" doc:name="Log Exception Summary"/>
+        </catch-exception-strategy>
+    </flow>
+
+</mule>

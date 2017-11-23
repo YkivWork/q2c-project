@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:mock="http://www.mulesoft.org/schema/mule/mock"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:core="http://www.mulesoft.org/schema/mule/core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/mock http://www.mulesoft.org/schema/mule/mock/current/mule-mock.xsd
+http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+    <munit:config name="munit" doc:name="MUnit configuration"/>
+    <spring:beans>
+        <spring:import resource="classpath:oracle-lookups.xml"/>
+        <spring:import resource="classpath:oracle-auth.xml"/>
+        <spring:import resource="classpath:globals.xml"/>
+    </spring:beans>
+    <munit:test name="new-test-suite-lookupXXXFromInvoiceMappingTest" description="Test">
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock Auth">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('getOracleAuthFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="{ }" mimeType="application/json"/>
+
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:then-return payload="#[getResource('oracle-get-invoice-mapping.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+        
+        <munit:set payload="#[ ['currency': 'USD', 'legalEntity': '010', 'operatingUnitId': '21'] ]" doc:name="Set Message"/>
+
+        <flow-ref name="lookupFromInvoiceMappingFlow" doc:name="lookupFromInvoiceMappingFlow"/>
+
+        <munit:assert-on-equals message="verbiage is invalid" expectedValue="Terms: Due upon receipt" actualValue="#[payload.verbiage]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="headerLeft is invalid" expectedValue="&lt;null>" actualValue="#[payload.headerLeft]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="headerRight is invalid" expectedValue="&lt;null>" actualValue="#[payload.headerRight]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="footerLeft is invalid" expectedValue="Remit Check Payment to ..." actualValue="#[payload.footerLeft]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="footerRight is invalid" expectedValue="Remit ACH/Fed Wire Payment to..." actualValue="#[payload.footerRight]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="footerNote is invalid" expectedValue="#[]" actualValue="#[payload.footerNote]" doc:name="Assert Equals"/>
+    </munit:test>
+</mule>

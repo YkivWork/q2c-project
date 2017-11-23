@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+      xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:spring="http://www.springframework.org/schema/beans"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd">
+
+    <sub-flow name="updateAriaCreationFieldInSfdcFlow">
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%namespace env http://schemas.xmlsoap.org/soap/envelope/
+%namespace aria urn:client:api:wsdl:document/literal_wrapped:vers:11.0:aria_complete_m_api
+---
+[{
+  Id: flowVars.theProject.projectSfdcId,
+  Aria_Account_Creation__c: flowVars.ariaResponse.errorMessage
+}]]]></dw:set-payload>
+        </dw:transform-message>
+
+        <logger message="system=SFDC method=updateDatasiteOneProject action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <logger message="system=SFDC method=updateDatasiteOneProject action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <sfdc:update config-ref="Salesforce__Basic_Authentication" type="DatasiteOne_Project__c" doc:name="Salesforce"/>
+        <logger message="system=SFDC method=updateDatasiteOneProject action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+    </sub-flow>
+</mule>

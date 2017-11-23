@@ -1,0 +1,82 @@
+{
+  [
+    {
+      "STARTDATE": "2017-03-28T00:00:00",
+      "IdentifierValue": "a2dS0000000QsSQIA0",
+      "ENDDATE": null,
+      "Qualifier2Key": null,
+      "ISDELETED": 0,
+      "Qualifier2Value": null,
+      "IdentifierTypeKey": "SF_BILLCO",
+      "Entity": "PROJECT",
+      "Identifier": "NOT-YET",
+      "Qualifier1Key": "VALUE ADDED TAX",
+      "Qualifier1Value": "VATP"
+    },
+    {
+      "STARTDATE": "2017-03-28T00:00:00",
+      "IdentifierValue": "a2YS0000002unFJMAY",
+      "ENDDATE": null,
+      "Qualifier2Key": null,
+      "ISDELETED": 0,
+      "Qualifier2Value": null,
+      "IdentifierTypeKey": "SF_BILLADDR",
+      "Entity": "PROJECT",
+      "Identifier": "NOT-YET",
+      "Qualifier1Key": "OPERATION UNIT",
+      "Qualifier1Value": "US_OU-MERRILL CORPORATION"
+    },
+    {
+      "STARTDATE": "2017-03-28T00:00:00",
+      "IdentifierValue": "32123",
+      "ENDDATE": null,
+      "Qualifier2Key": null,
+      "ISDELETED": 0,
+      "Qualifier2Value": null,
+      "IdentifierTypeKey": "ORA_Acct",
+      "Entity": "PROJECT",
+      "Identifier": "Oracle AccountID",
+      "Qualifier1Key": "VALUE ADDED TAX",
+      "Qualifier1Value": "VATP"
+    },
+    {
+      "STARTDATE": "2017-03-28T00:00:00",
+      "IdentifierValue": "32123",
+      "ENDDATE": null,
+      "Qualifier2Key": null,
+      "ISDELETED": 0,
+      "Qualifier2Value": null,
+      "IdentifierTypeKey": "ORA_Site",
+      "Entity": "PROJECT",
+      "Identifier": "Oracle SiteID",
+      "Qualifier1Key": "OPERATION UNIT",
+      "Qualifier1Value": "US_OU-MERRILL CORPORATION"
+    },
+    {
+      "STARTDATE": "2017-03-28T00:00:00",
+      "IdentifierValue": "27700",
+      "ENDDATE": null,
+      "Qualifier2Key": null,
+      "ISDELETED": 0,
+      "Qualifier2Value": null,
+      "IdentifierTypeKey": "ORA_Acct",
+      "Entity": "PROJECT",
+      "Identifier": "Oracle AccountID",
+      "Qualifier1Key": "VALUE ADDED TAX",
+      "Qualifier1Value": "VATP"
+    },
+    {
+      "STARTDATE": "2017-03-28T00:00:00",
+      "IdentifierValue": "a27S0000000k915IAA",
+      "ENDDATE": null,
+      "Qualifier2Key": null,
+      "ISDELETED": 0,
+      "Qualifier2Value": null,
+      "IdentifierTypeKey": "SF_Proj",
+      "Entity": "PROJECT",
+      "Identifier": "SFDC DatasiteOne ProjectID",
+      "Qualifier1Key": null,
+      "Qualifier1Value": null
+    }
+  ]
+}

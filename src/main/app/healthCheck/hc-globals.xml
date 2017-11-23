@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+xmlns:http="http://www.mulesoft.org/schema/mule/http"
+xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml"
+xmlns:spring="http://www.springframework.org/schema/beans"
+xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+xmlns:context="http://www.springframework.org/schema/context"
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-current.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+	<http:request-config name="HC_DSO_Auth_Request_Configuration"
+		protocol="HTTPS" host="${hc.dso.auth.host}" port="${hc.dso.auth.port}"
+		basePath="/" doc:name="HTTP Request Configuration" />
+	
+	<http:request-config name="HC_DSO_API_HTTP_Request_Configuration"
+		protocol="HTTPS" host="${hc.dso.api.host}" port="${hc.dso.api.port}"
+		 doc:name="HTTP Request Configuration">
+	</http:request-config>
+	
+    <http:request-config name="HC_HTTP_Request_Configuration_to_Aria"  host="${hc.aria.host}" port="${hc.aria.port}" basePath="/" doc:name="HTTP Request Configuration" protocol="HTTPS"/>	
+	
+	<http:request-config name="HC_ORACLE_HTTP_Request_Configuration"
+		host="${hc.oracle.host}" port="${hc.oracle.port}" basePath="/"
+		doc:name="oracleSystemRequestConfiguration" responseTimeout="${hc.response.timeout}">
+		<http:basic-authentication username="${hc.oracle.username}"
+			password="${hc.oracle.password}" />
+	</http:request-config>
+	
+    <sfdc:config name="HC_Salesforce__Basic_Authentication" username="${hc.sfdc.username}" password="${hc.sfdc.password}" securityToken="${hc.sfdc.securityToken}" url="${hc.sfdc.url}" doc:name="Salesforce" doc:description="SFDC Instance" disableSessionInvalidation="true">
+        <sfdc:connection-pooling-profile initialisationPolicy="INITIALISE_ALL" exhaustedAction="WHEN_EXHAUSTED_GROW" maxActive="1" maxIdle="1"/>
+        <reconnect-forever frequency="5000" blocking="false"/>
+    </sfdc:config>
+	
+</mule>

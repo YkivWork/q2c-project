@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd">
+    <flow name="mapSFDCProject" processingStrategy="synchronous">
+        <vm:inbound-endpoint exchange-pattern="request-response" path="VM_MAP_SFDC_PROJECT" connector-ref="VM_IN_MEMORY" doc:name="vmMapSFDCProject"/>
+        <logger message="***Map SFDC Project: #[message.payloadAs(java.lang.String)]" level="INFO" category="mapSFDCProject" doc:name="[DEBUG]Log Initial Payload"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+payload reduce (payload)]]></dw:set-payload>
+        </dw:transform-message>
+
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="projectPayload"><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-variable>
+        </dw:transform-message>
+
+        <set-payload value="#[flowVars.projectPayload]" doc:name="Set Payload"/>
+        <dw:transform-message doc:name="Augment Salesforce Project">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+using (
+  dsoCompanies = lookup("GET_DATASITEONE_COMPANY", {projectId: payload.Id})
+)
+{
+  activeDate: payload.Active_Date__c,
+  adminEmail: payload.Admin_Email__c,
+  ariaCreation: payload.Aria_Account_Creation__c,
+  billingEffectiveDate: payload.Billing_Effective_Date__c,
+  businessUnit: payload.Business_Unit__c,
+  closureMediaInclude: payload.Closure_Media_Included__c,
+  continuationDate: payload.Continuation_of_Services_Date__c,
+  continuationRate: payload.Continuation_Rate__c,
+  continuationRateSM: payload.Continuation_Rate_Special_Media__c,
+  contractCustomer: payload.Contract_Customer__c,
+  contractTerm: payload.Contract_Term__c,
+  countryOfIssuer: payload.Country_of_Issuer__c,
+  createdAt: payload.CreatedDate,
+  currency: payload.CurrencyIsoCode,
+  dataCenter: payload.Datacenter__c,
+  datasiteOneId: payload.DatasiteOne_ProjectID__c,
+  hibernationRate: payload.Hibernation_Rate__c,
+  hibernationRateSM: payload.Hibernation_Rate_Special_Media__c,
+  legalEntity: payload.Legal_Entity__c,
+  minimumFee: payload.Minimum_Fee__c,
+  modifiedAt: payload.LastModifiedDate,
+  name: payload.Name,
+  operatingUnitId: payload.Operating_Unit_ID__c,
+  operatingUnitName: payload.Operating_Unit_Name__c,
+  primaryServiceSite: payload.Primary_Service_Site__c,
+  productType: payload.Product_Type__c,
+  payloadCreateDate: payload.Project_Create_Date__c,
+  projectSfdcId: payload.Salesforce_ProjectID__c,
+  projectStatus: payload.Project_Status__c,
+  retroStartDate: payload.Retro_Start_Date_Test_Only_Manual__c,
+  revenueSite: payload.Revenue_Site__c,
+  sales: payload.Sales__c,
+  specialMediaRate: payload.Special_Media_Rate__c,
+  tier1Rate: payload.Tier_1_Rate_Value__c,
+  tier1UpperLimit: payload.Tier_1_Upper_Level_Limit__c,
+  tier2Rate: payload.Tier_2_Rate_Value__c,
+  tier2UpperLimit: payload.Tier_2_Upper_Level_Limit__c,
+  tier3Rate: payload.Tier_3_Rate_Value__c,
+  tier3UpperLimit: payload.Tier_3_Upper_Level_Limit__c,
+  tier4Rate: payload.Tier_4_Rate_Value__c,
+  tier4UpperLimit: payload.Tier_4_Upper_Level_Limit__c,
+  tier5Rate: payload.Tier_5_Rate_Value__c,
+  tier5UpperLimit: payload.Tier_5_Upper_Level_Limit__c,
+  tier6Rate: payload.Tier_6_Rate_Value__c,
+  tier6UpperLimit: payload.Tier_6_Upper_Level_Limit__c,
+  tier7Rate: payload.Tier_7_Rate_Value__c,
+  tier7UpperLimit: payload.Tier_7_Upper_Level_Limit__c,
+  tier8Rate: payload.Tier_8_Rate_Value__c,
+  tier8UpperLimit: payload.Tier_8_Upper_Level_Limit__c,
+  tier9Rate: payload.Tier_9_Rate_Value__c,
+  tier9UpperLimit: payload.Tier_9_Upper_Level_Limit__c,
+  tier10Rate: payload.Tier_10_Rate_Value__c,
+  unitOfMeasure: payload.Unit_of_Measure__c,
+
+  companies: dsoCompanies map ((dsoCompany, dsoCompIndex) ->
+  using (
+    billingAddress = lookup("GET_BILLING_BY_ID", {id: dsoCompany.Billing_Address__c}),
+    billingCompany = lookup("GET_BILLING_COMPANY_BY_ID", {id: dsoCompany.Billing_Company__c }) default {}    
+  )
+  using (
+  	//This is only used to get at a single element instead of an array.
+  	//But we need to handle the case when nothing was found too
+    billingAddress = {} when (sizeOf billingAddress) < 1 otherwise billingAddress[0],
+    billingCompany = {} when (sizeOf billingCompany) < 1 otherwise billingCompany[0]
+  )
+  {
+    customerOrderNumber: dsoCompany.Customer_Order_Number__c,
+    email: dsoCompany.Email_Address__c,
+    firstName: dsoCompany.First_Name__c,
+    lastName: dsoCompany.Last_Name__c,
+    name: dsoCompany.Name,
+    phone: dsoCompany.Phone__c,
+    sfdcId: dsoCompany.Id,
+    retroChange: dsoCompany.Retro_Change__c == 'Yes',
+    billingSplit: dsoCompany.Billing_Split__c,
+
+    billingAddress: {
+      address1: billingAddress.Address_1__c,
+      address2: billingAddress.Address_2__c,
+      address3: billingAddress.Address_3__c,
+      city: billingAddress.City__c,
+      country: billingAddress.Country__c,
+
+      locality: billingAddress.Locality__c,
+      middleInitial: billingAddress.Middle_Initial__c,
+      name: billingAddress.Name,
+      oracleSiteId: billingAddress.Oracle_ID__c,
+      postalCode: billingAddress.Postal_Code__c,
+      sfdcId: billingAddress.Id,
+      stateProvince: billingAddress.State_Province__c
+    },
+    billingCompany: {
+      name: billingCompany.Name,
+      oracleAccountId: billingCompany.Oracle_ID__c,
+      sfdcId: billingCompany.Id,
+      vatRegistration: billingCompany.VAT__c
+    }
+  })
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="Merrill Project Payload: #[message.payloadAs(java.lang.String)]" level="INFO" category="mapSFDCProject" doc:name="Log Payload"/>
+        <json:object-to-json-transformer mimeType="application/json" doc:name="Object to JSON"/>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="Exception Summary: #[exception.getSummaryMessage()]" level="ERROR" category="mapSFDCProject" doc:name="Log Exception Summary"/>
+            <set-payload value="Unable to map payload #[payload] to Merrill Project" doc:name="Set Payload"/>
+            <set-property propertyName="http.status" value="#[400]" doc:name="400"/>
+        </catch-exception-strategy>
+    </flow>
+</mule>

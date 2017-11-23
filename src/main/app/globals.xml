@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:secure-property-placeholder="http://www.mulesoft.org/schema/mule/secure-property-placeholder"
+	xmlns:microsoftservicebus="http://www.mulesoft.org/schema/mule/microsoftservicebus"
+	xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore"
+	xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:smtp="http://www.mulesoft.org/schema/mule/smtp" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/secure-property-placeholder http://www.mulesoft.org/schema/mule/secure-property-placeholder/current/mule-secure-property-placeholder.xsd
+http://www.mulesoft.org/schema/mule/microsoftservicebus http://www.mulesoft.org/schema/mule/microsoftservicebus/current/mule-microsoftservicebus.xsd
+http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/smtp http://www.mulesoft.org/schema/mule/smtp/current/mule-smtp.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+
+	<secure-property-placeholder:config name="Secure_Property_Placeholder" key="${runtime.key}" location="common.properties,hc-${mule.env}.properties,${mule.env}.properties" doc:name="Secure Property Placeholder"/>
+
+	<microsoftservicebus:azureConfig name="Microsoft_Service_Bus__Azure_Service_Bus" namespace="${azure.sb.namespace}" userName="${azure.sb.sharedAccessKeyName}" password="${azure.sb.sharedAccessKey}" doc:name="Microsoft Service Bus: Azure Service Bus"/>    
+    <vm:connector name="VM_IN_MEMORY" validateConnections="true" doc:name="VM">
+        <vm:queue-profile>
+            <default-in-memory-queue-store/>
+        </vm:queue-profile>
+    </vm:connector>
+    <objectstore:config name="Project_Company_History_Object_Store" partition="SFDC_HISTORY"  doc:name="ObjectStore: Connector" objectStore-ref="_defaultUserObjectStore"/>
+	<mulexml:namespace-manager
+		includeConfigNamespaces="true">
+		<mulexml:namespace prefix="soap"
+			uri="http://schemas.xmlsoap.org/soap/envelope/" />
+		<mulexml:namespace prefix="aria"
+			uri="urn:client:api:wsdl:document/literal_wrapped:vers:11.0:aria_complete_m_api" />
+	</mulexml:namespace-manager>
+
+	<!-- <context:property-placeholder
+		location="common.properties,${mule.env:dev}.properties" /> -->
+
+	<ee:object-store-caching-strategy
+		entryTTL="600000" name="ExpirableCachingStrategy" doc:name="Caching Strategy" />
+
+	<ee:object-store-caching-strategy
+		entryTTL="600000" name="InvoiceTemplateExpirableCachingStrategy" doc:name="InvoiceTemplateCaching Strategy" />
+
+	<http:request-config name="ariaRequestConfiguration"
+		host="${aria.host}" port="443" protocol="HTTPS" basePath="/"
+		doc:name="ariaRequestConfiguration" />
+	<http:request-config name="ariaAdminToolsRequestConfiguration"
+		host="${aria.admintools.host}" port="443" protocol="HTTPS" basePath="/"
+		doc:name="ariaAdminToolsRequestConfiguration" />
+	<http:request-config name="ariaWorkflowRequestConfiguration"
+        host="${aria.workflow.host}" port="443" protocol="HTTPS" basePath="/"
+        doc:name="ariaWorkflowRequestConfiguration" responseTimeout="${aria.workflow.response.timeout}" />
+
+	<http:request-config name="dsoApiRequestConfiguration"
+		host="${dso.api.host}" port="${dso.api.host.port}" protocol="HTTPS"
+		basePath="/" doc:name="dsoApiRequestConfiguration" responseTimeout="120000" />
+	<http:request-config name="dsoAuthRequestConfiguration"
+		host="${dso.auth.host}" port="${dso.auth.host.port}" protocol="HTTPS"
+		basePath="/" doc:name="dsoAuthRequestConfiguration" responseTimeout="120000" />
+
+	<http:request-config name="mdrSystemRequestConfiguration"
+		host="${mdr.system.host}" port="${mdr.system.port}" basePath="/"
+		doc:name="mdrSystemRequestConfiguration" responseTimeout="120000">
+
+	</http:request-config>
+
+	<http:request-config name="oracleRequestConfiguration"
+		host="${oracle.host}" port="${oracle.port}" basePath="/"
+		doc:name="oracleSystemRequestConfiguration" responseTimeout="${response.timeout}">
+		<http:basic-authentication username="${oracle.username}"
+			password="${oracle.password}" />
+	</http:request-config>
+
+	<sfdc:config name="Salesforce__Basic_Authentication"
+		username="${sfdc.username}" password="${sfdc.password}" securityToken="${sfdc.securityToken}"
+		url="${sfdc.url}" doc:name="Salesforce" doc:description="SFDC Instance">
+		<reconnect-forever frequency="5000" blocking="false" />
+	</sfdc:config>
+	
+    <expression-filter expression="#[payload.errorMessage == 'OK']" name="Aria_Response_Evaluation" doc:name="Expression"/>
+    
+    <expression-filter expression="#[payload.status == 'S']" name="Oracle_Response_Evaluation" doc:name="Expression"/>
+    <ee:object-store-caching-strategy name="ProjOrgExpirableCachingStrategy" doc:name="Caching Strategy"/>
+    <ee:object-store-caching-strategy name="lookupInvoiceCachingStrategy" doc:name="Caching Strategy"/>  
+</mule>

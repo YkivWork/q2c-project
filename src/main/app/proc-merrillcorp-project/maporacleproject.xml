@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd">
+    <flow name="MAP_ORACLE_PROJECT" processingStrategy="synchronous">
+        <vm:inbound-endpoint exchange-pattern="request-response" path="VM_MAP_ORACLE_PROJECT" connector-ref="VM_IN_MEMORY" doc:name="VM_MAP_ORACLE_PROJECT"/>
+
+        <dw:transform-message doc:name="Transform Project Request to Java Object">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <expression-component doc:name="Intial Post Project Request Payload variables"><![CDATA[flowVars.theProject=payload;]]></expression-component>
+        <dw:transform-message doc:name="Generate Get Project Organization Id Request Payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	"businessUnit": payload.businessUnit,
+  	"revenueSite": payload.revenueSite,
+  	"countryOfIssuer": payload.countryOfIssuer
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <vm:outbound-endpoint exchange-pattern="request-response" path="VM_GET_PROJECT_ORGANIZATION_ID" connector-ref="VM_IN_MEMORY" doc:name="VM_GET_PROJECT_ORGANIZATION_ID"/>
+        <dw:transform-message doc:name="Transform Response to Java Object">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <expression-component doc:name="Initialize Project Organization Id variable"><![CDATA[flowVars.projectOrgId=payload;]]></expression-component>
+
+        <dw:transform-message doc:name="Prepare Payload for Project Creation">
+			<dw:set-payload resource="classpath:dataweave/prepareCreateProjectInOracle.dwl"/>
+        </dw:transform-message>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="#[exception.getSummarymessage()]" level="ERROR" category="MAP_ORACLE_PROJECT" doc:name="Log Exception Summary"/>
+        </catch-exception-strategy>        
+    </flow>
+</mule>

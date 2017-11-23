@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+
+
+    <sub-flow name="findProjectOrganizationId_subFlow">
+        <dw:transform-message doc:name="Save Payload to inputPayload">
+            <dw:set-variable variableName="inputPayload"><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-variable>
+        </dw:transform-message>
+
+        <flow-ref name="getOracleAuthFlow" doc:name="getOracleAuthFlow"/>
+        <dw:transform-message doc:name="Set Payload to Get Project Org Mapping">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+  "GET_PROJ_ORG_MAPPING_Input": {
+    "RESTHeader": {
+      "RespApplication": "PA",
+      "SecurityGroup": "STANDARD",
+      "NLSLanguage": "AMERICAN"
+    },
+    "InputParameters": {
+      "P_BUSINESS": "DATASITE"
+    }
+  }
+}
+]]></dw:set-payload>
+        </dw:transform-message>
+        <ee:cache cachingStrategy-ref="ProjOrgExpirableCachingStrategy" doc:name="Cache">
+            <logger message="system=Oracle method=GetLookupTable action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+            <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="setPayloadBeforeUntilSuccess"/>
+            <until-successful maxRetries="${oracle.http.max.retries}" millisBetweenRetries="${oracle.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful">
+                <http:request config-ref="oracleRequestConfiguration" path="${oracle.projectMapping.path}" method="POST" doc:name="Get Project Org Mapping">
+                    <http:request-builder>
+                        <http:header headerName="Cookie" value="#[flowVars.oracleAuth.tokenName + '=' + flowVars.oracleAuth.accessToken]"/>
+                    </http:request-builder>
+                </http:request>
+            </until-successful>
+            <logger message="system=Oracle method=GetLookupTable action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+            </dw:transform-message>
+        </ee:cache>
+        <dw:transform-message doc:name="Get The Project Org Id">
+            <dw:input-payload doc:sample="oracle-project-org-map-response.json"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload.OutputParameters.X_PROJECT_ORGS.X_PROJECT_ORGS_ITEM[?( $.BUSINESS_UNIT == (upper flowVars.theProject.businessUnit) and  $.REVENUE_SITE == flowVars.theProject.revenueSite[0..2] and $.COUNTRY_OF_ISSUER  == flowVars.theProject.countryOfIssuer) ].PROJ_ORG_ID[0]
+]]></dw:set-payload>
+        </dw:transform-message>
+    </sub-flow>
+
+    <sub-flow name="GET_PROJECT_ORGANIZATION_ID">
+        <flow-ref name="getOracleAuthFlow" doc:name="getOracleAuthFlow"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+  "GET_PROJ_ORG_MAPPING_Input": {
+    "RESTHeader": {
+      "RespApplication": "PA",
+      "SecurityGroup": "STANDARD",
+      "NLSLanguage": "AMERICAN"
+    },
+    "InputParameters": {
+      "P_BUSINESS": "DATASITE"
+    }
+  }
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <ee:cache cachingStrategy-ref="ProjOrgExpirableCachingStrategy" doc:name="Cache">
+            <logger message="system=Oracle method=ProjOrgMapping action=request projectId=#[flowVars.projectId] payload=#[message.payloadAs(java.lang.String)]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+            <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="Session Variable"/>
+            <until-successful maxRetries="${oracle.http.max.retries}" millisBetweenRetries="${oracle.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful">
+                <http:request config-ref="oracleRequestConfiguration" path="${oracle.projectMapping.path}" method="POST" doc:name="Get Project Org Mapping">
+                    <http:request-builder>
+                        <http:header headerName="Cookie" value="#[flowVars.oracleAuth.tokenName + '=' + flowVars.oracleAuth.accessToken]"/>
+                    </http:request-builder>
+                </http:request>
+            </until-successful>
+            <logger message="system=Oracle method=ProjOrgMapping action=response projectId=#[flowVars.projectId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+            </dw:transform-message>
+        </ee:cache>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="projectOrgId"><![CDATA[%dw 1.0
+%output application/java
+---
+payload.OutputParameters.X_PROJECT_ORGS.X_PROJECT_ORGS_ITEM[?(
+ $.BUSINESS_UNIT == (upper flowVars.theProject.businessUnit) and
+ $.REVENUE_SITE == flowVars.theProject.revenueSite[0..2] and
+ $.COUNTRY_OF_ISSUER  == flowVars.theProject.countryOfIssuer
+)][0].PROJ_ORG_ID
+]]></dw:set-variable>
+        </dw:transform-message>
+        <logger message="system=Oracle method=ProjOrgMapping action=parsed projectId=#[flowVars.projectId]: #[payload]" level="DEBUG" category="GET_PROJECT_ORGANIZATION_ID" doc:name="Logger"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload[0]]]></dw:set-payload>
+        </dw:transform-message>
+
+    </sub-flow>
+
+
+
+    <flow name="lookupFromInvoiceMappingFlow" processingStrategy="synchronous">
+        <set-variable value="#[payload]" variableName="originalPayload" doc:name="Save Payload to originalPayload"/>
+
+        <flow-ref name="getOracleAuthFlow" doc:name="getOracleAuthFlow"/>
+
+        <dw:transform-message doc:name="Set Payload to get Invoice Mapping">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+  "GET_INVOICE_MAPPING_Input": {
+    "RESTHeader": {
+      "RespApplication": "PA",
+      "SecurityGroup": "STANDARD",
+      "NLSLanguage": "AMERICAN"
+    },
+    "InputParameters": {}
+  }
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <ee:cache cachingStrategy-ref="lookupInvoiceCachingStrategy" doc:name="Cache">
+            <logger message="system=Oracle method=GetInvoiceMapping action=request projectId=#[flowVars.projectId] payload=#[message.payloadAs(java.lang.String)]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+            <http:request config-ref="oracleRequestConfiguration" path="${oracle.invoiceMapping.path}" method="POST" doc:name="Get Invoice Mapping Table">
+                <http:request-builder>
+                    <http:header headerName="Cookie" value="#[flowVars.oracleAuth.tokenName + '=' + flowVars.oracleAuth.accessToken]"/>
+                </http:request-builder>
+            </http:request>
+            <logger message="system=Oracle method=GetInvoiceMapping action=response projectId=#[flowVars.projectId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+            <logger message="system=Oracle method=GetInvoiceMapping action=response projectId=#[flowVars.projectId] payload=#[message.payloadAs(java.lang.String)]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+            <dw:transform-message doc:name="Get The invoice Map">
+                <dw:input-payload doc:sample="project-org-map-response.json"/>
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%var theEntry = payload.OutputParameters.X_INV_MAP.X_INV_MAP_ITEM[?( $.CURRENCY_CODE == (upper flowVars.originalPayload.currency) and  $.LEGAL_ENTITY == flowVars.originalPayload.legalEntity and $.OPERATING_UNIT_ID == flowVars.originalPayload.operatingUnitId ) ][0]
+---
+{
+  verbiage: theEntry.TERMS_VERBIAGE,
+  
+  headerLeft: theEntry.HEADER_LEFT,
+  headerRight: theEntry.HEADER_RIGHT,
+  
+  footerLeft: theEntry.FOOTER_LEFT,
+  footerRight: theEntry.FOOTER_RIGHT,
+
+  footerNote: theEntry.FOOTER_NOTE
+}]]></dw:set-payload>
+            </dw:transform-message>
+        </ee:cache>
+
+        <catch-exception-strategy doc:name="Catch Exception Strategy" logException="false">
+            <logger message="lookupFromInvoiceMappingFlow Failed! #[message.payloadAs(java.lang.String)] #[exception.getSummaryMessage()] projectId=#[flowVars.projectId]" level="ERROR" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        </catch-exception-strategy>
+    </flow>
+    <sub-flow name="GetInvoiceTemplateMappingFromOracleSub_Flow">
+        <ee:cache cachingStrategy-ref="InvoiceTemplateExpirableCachingStrategy" doc:name="Cache">
+            <dw:transform-message doc:name="Set Payload To Get Invoice Template Mapping">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+
+  "GET_INVOICE_TEMPLATE_MAPPING_Input": {
+
+    "InputParameters": {}  
+
+  }
+
+}]]></dw:set-payload>
+            </dw:transform-message>
+
+            <logger message="system=Oracle method=GetInvoiceTemplateMapping action=request projectId=#[flowVars.projectId] payload=#[message.payloadAs(java.lang.String)]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+            <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="setPayloadBeforeUntilSuccess"/>
+            <until-successful maxRetries="${oracle.http.max.retries}" millisBetweenRetries="${oracle.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="UntilSuccessfulForInvoiceCreation">
+                <http:request config-ref="oracleRequestConfiguration" path="${oracle.invoiceTemplateMapping.path}" method="POST" doc:name="GetInvoiceTemplateMapping">
+                    <http:request-builder>
+                        <http:header headerName="Cookie" value="#[flowVars.oracleAuth.tokenName + '=' + flowVars.oracleAuth.accessToken]"/>
+                    </http:request-builder>
+                    <http:success-status-code-validator values="0..599"/>
+                </http:request>
+            </until-successful>
+            <logger message="system=Oracle method=GetInvoiceTemplateMapping action=response projectId=#[flowVars.projectId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+            <dw:transform-message doc:name="Parse Invoice Template Mapping">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload.OutputParameters.X_INV_TEMPL_MAP.X_INV_TEMPL_MAP_ITEM]]></dw:set-payload>
+            </dw:transform-message>
+        </ee:cache>
+    </sub-flow>
+    
+    <flow name="lookupFromInvoiceTemplateMapping_Flow" processingStrategy="synchronous">
+        <set-variable variableName="originalPayload" value="#[payload]" doc:name="Save Payload to OriginalPayload"/>
+        <flow-ref name="getOracleAuthFlow" doc:name="getOracleAuthFlow"/>
+        <flow-ref name="GetInvoiceTemplateMappingFromOracleSub_Flow" doc:name="GetInvoiceTemplateMappingFromOracleSub_Flow"/>
+
+        <dw:transform-message doc:name="Parse The Invoice Template">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%var theEntry = payload[?($.COUNTRY_CODE == (upper flowVars.originalPayload.country) and $.BUSINESS_UNIT == (upper flowVars.originalPayload.businessUnit)) ][0]
+---
+{
+	businessUnit: theEntry.BUSINESS_UNIT,
+	countryCode: theEntry.COUNTRY_CODE,
+	statementTemplate: theEntry.STATEMENT_TEMPLATE,
+	creditNoteTemplate: theEntry.CREDIT_NOTE_TEMPLATE,
+	creditMemoTemplate: theEntry.CREDIT_MEMO_TEMPLATE,
+	rebillTemplate: theEntry.REBILL_TEMPLATE	
+}]]></dw:set-payload>
+
+        </dw:transform-message>
+        <logger message="system=Oracle action=results method=InvoiceTemplate projectId=#[flowVars.projectId] payload='#[message.payloadAs(java.lang.String)]'" level="INFO" doc:name="Logger"/>
+
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="lookupFromInvoiceTemplateMapping_Flow Failed! #[message.payloadAs(java.lang.String)] #[exception.getSummaryMessage()] projectId=#[flowVars.projectId]" level="ERROR" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        </catch-exception-strategy>
+    </flow>
+</mule>

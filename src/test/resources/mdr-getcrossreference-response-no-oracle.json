@@ -1,0 +1,14 @@
+[
+  {
+    "STARTDATE": "2017-01-04T00:00:00",
+    "IdentifierValue": "Aria10",
+    "EntityTypeKey": "ORG",
+    "ENDDATE": "2017-03-31T00:00:00",
+    "Qualifier2Key": "LEGALENT",
+    "ISDELETED": 0,
+    "Qualifier2Value": "LLC",
+    "IdentifierTypeKey": "Aria_Acct",
+    "Qualifier1Key": "CURRENCY",
+    "Qualifier1Value": "USD"
+  }
+]

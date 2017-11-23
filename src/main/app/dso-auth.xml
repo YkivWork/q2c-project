@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http"
+xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+xmlns="http://www.mulesoft.org/schema/mule/core"
+xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+xmlns:spring="http://www.springframework.org/schema/beans"
+
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:schemaLocation="http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+
+    <sub-flow name="getDSOAuth_Sub_Flow">
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	password: p("dso.password"),
+	username: p("dso.username"),
+	client_id: p("dso.clientId"),
+	client_secret: p("dso.clientSecret"),
+	grant_type : p("dso.grantType")
+	
+}]]></dw:set-payload>
+        </dw:transform-message>
+        
+        <logger message="Performing auth for DSO" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="setPayloadBeforeUntilSuccess"/>
+        <until-successful maxRetries="${dso.http.max.retries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful" millisBetweenRetries="${dso.http.milliSecondsBetweenRetries}">
+            <http:request config-ref="dsoAuthRequestConfiguration" path="/as/token.oauth2" method="POST" doc:name="Dso_GetToken">
+                <http:request-builder>
+                    <http:header headerName="Content-Type" value="application/x-www-form-urlencoded"/>
+                </http:request-builder>
+            </http:request>
+        </until-successful>
+
+        <logger message="Received auth response for DSO" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="dsoToken"><![CDATA[%dw 1.0
+%output application/java
+---
+payload.access_token]]></dw:set-variable>
+        </dw:transform-message>
+    </sub-flow>
+
+</mule>

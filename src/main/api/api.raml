@@ -1,0 +1,75 @@
+#%RAML 1.0
+title: Q2C-PROJECT
+baseUri: localhost:8081/api/
+description: This API
+
+/health-check:
+  /salesforce:
+    displayName: Health_Check
+    description: Call to Return Health Of Salesforce Connections
+    get:
+      responses:
+        200:
+          body:
+            application/json:
+              example: {"Status": "OK"}
+        400:
+        500:
+          body:
+            application/json:
+              example: {"Status": "FAILURE"}
+  /aria:
+    displayName: Health_Check
+    description: Call to Return Health Of Aria Connections
+    get:
+      responses:
+        200:
+          body:
+            application/json:
+              example: {"Status": "OK"}
+        400:
+        500:
+          body:
+            application/json:
+              example: {"Status": "FAILURE"}
+  /oracle:
+    displayName: Health_Check
+    description: Call to Return Health Of Oracle Connections
+    get:
+      responses:
+        200:
+          body:
+            application/json:
+              example: {"Status": "OK"}
+        400:
+        500:
+          body:
+            application/json:
+              example: {"Status": "FAILURE"}
+  /dso:
+    displayName: Health_Check
+    description: Call to Return Health Of DSO Connections
+    get:
+      responses:
+        200:
+          body:
+            application/json:
+              example: {"Status": "OK"}
+        400:
+        500:
+          body:
+            application/json:
+              example: {"Status": "FAILURE"}
+/new-active-projects:
+  displayName: New-Active-Projects
+  description: Call to Start a Poll of Newly Active Projects
+  post:
+    responses:
+      200:
+        body:
+          application/json:
+            example: {"Status": "OK"}
+      500:
+        body:
+          application/json:
+            example: {"Status": "FAILURE"}              

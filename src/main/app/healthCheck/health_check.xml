@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd">
+    <flow name="GET_Health_SalesForce" processingStrategy="synchronous">
+        <sfdc:query config-ref="HC_Salesforce__Basic_Authentication" query="SELECT Status__c FROM Work_Order__c LIMIT 1" doc:name="Salesforce"/>
+        <byte-array-to-object-transformer doc:name="Byte Array to Object"/>
+        <logger message="#[message.payload.hasNext() ? message.payload.next() : null]" level="DEBUG" doc:name="[DEBUG] Log Payload"/>
+        <flow-ref name="SET_HTTP_Response" doc:name="SET_HTTP_Response"/>
+        <exception-strategy ref="global-exception-strategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <flow name="GET_Health_Aria" processingStrategy="synchronous">
+        <set-payload value="&lt;?xml version='1.0' encoding='UTF-8'?&gt;&lt;soap:Envelope xmlns:soap=&quot;http://schemas.xmlsoap.org/soap/envelope/&quot;&gt;&lt;soap:Header/&gt;&lt;soap:Body&gt;&lt;lit:get_acct_details_all_m xmlns:lit=&quot;urn:client:api:wsdl:document/literal_wrapped:vers:11.0:aria_complete_m_api&quot;&gt;&lt;client_no&gt;6000228&lt;/client_no&gt;&lt;auth_key&gt;R3WSkfamtH9bMUrACMtm7FAtx7u8vYFy&lt;/auth_key&gt;&lt;acct_no&gt;1607778&lt;/acct_no&gt;&lt;include_master_plans&gt;1&lt;/include_master_plans&gt;&lt;include_supp_plans&gt;1&lt;/include_supp_plans&gt;&lt;/lit:get_acct_details_all_m&gt;&lt;/soap:Body&gt;&lt;/soap:Envelope&gt;" doc:name="Set_Testing_Payload"/>
+        <http:request config-ref="HC_HTTP_Request_Configuration_to_Aria" path="${hc.aria.path}" method="POST" doc:name="GET_Acct_Details_Aria">
+            <http:request-builder>
+                <http:header headerName="SOAPAction" value="&quot;get_acct_details_all_m&quot;"/>
+                <http:header headerName="content-type" value="application/xml"/>
+            </http:request-builder>
+        </http:request>
+        <byte-array-to-object-transformer  doc:name="Byte Array to Object"/>
+        <logger message="#[payload]" level="DEBUG" doc:name="[DEBUG] Log Payload"/>
+        <flow-ref name="SET_HTTP_Response" doc:name="SET_HTTP_Response"/>
+        <exception-strategy ref="global-exception-strategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <flow name="SET_HTTP_Response" processingStrategy="synchronous">
+        <choice doc:name="Choice">
+            <when expression="#[message.exception != null]">
+                <set-payload value="{&quot;Status&quot;: &quot;Failure&quot;}" doc:name="SET_Error_Payload"/>
+                <set-property propertyName="http.status" value="500" doc:name="SET_Error_Status"/>
+            </when>
+            <otherwise>
+                <set-payload value="{&quot;Status&quot;: &quot;OK&quot;}" doc:name="SET_Success_Payload"/>
+                <set-property propertyName="http.status" value="200" doc:name="SET_Success_Status"/>
+            </otherwise>
+        </choice>
+        <exception-strategy ref="global-exception-strategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <flow name="GET_DSOAuth" processingStrategy="synchronous">
+        <dw:transform-message doc:name="CREATE_DSOAuth_Payload">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+{
+	password: p("hc.dso.password"),
+	username: p("hc.dso.username"),
+	client_id: p("hc.dso.clientId"),
+	client_secret: p("hc.dso.clientSecret"),
+	grant_type : p("hc.dso.grantType")
+	
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <http:request config-ref="HC_DSO_Auth_Request_Configuration" path="${hc.dso.auth.path}" method="POST" doc:name="Dso_GetToken">
+            <http:request-builder>
+                <http:header headerName="Content-Type" value="application/x-www-form-urlencoded"/>
+            </http:request-builder>
+        </http:request>
+        <logger message=" In getDSOAuth_Sub_Flow after Dso_GetToken *** Payload *** #[message.payloadAs(java.lang.String)] " level="DEBUG" doc:name="[DEBUG] Log Payload"/>
+        <dw:transform-message doc:name="TRANSFORM_Response_to_Java">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <set-variable variableName="dsoToken" value="#[payload['access_token']]" doc:name="SET_Access_Token_Variable"/>
+        <logger message="End of GET_DSOAuth" level="DEBUG" category="com.merrillcorp.q2c" doc:name="[DEBUG] Log Payload"/>
+        <exception-strategy ref="global-exception-strategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <flow name="GET_Oracle_Auth" processingStrategy="synchronous">
+        <logger message="Calling oracle login." level="DEBUG" category="com.merrillcorp.q2c" doc:name="[DEBUG] Beginning Flow"/>
+        <until-successful maxRetries="${hc.oracle.http.max.retries}" millisBetweenRetries="${hc.oracle.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful">
+            <http:request config-ref="HC_ORACLE_HTTP_Request_Configuration" path="/webservices/rest/login" method="GET" doc:name="GET_Oracle_Auth_Token"/>
+        </until-successful>
+        <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
+        <dw:transform-message doc:name="TRANSFORM_Response_to_Java">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+{
+  accessToken: payload.data.accessToken,
+  tokenName: payload.data.accessTokenName
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="#[payload]" level="DEBUG"  doc:name="[DEBUG] Log Token"/>
+    </flow>
+    <flow name="GET_Health_Oracle" processingStrategy="synchronous">
+        <flow-ref name="GET_Oracle_Auth" doc:name="GET_Oracle_Auth"/>
+        <logger message="Received Oracle Auth" level="DEBUG" doc:name="[DEBUG] Received Oracle Auth"/>
+        <expression-component doc:name="Init_Oracle_Auth_Variables"><![CDATA[flowVars.oracleAuth=payload;]]></expression-component>
+        <set-payload value="{&quot;SALESREP_Input&quot;:{&quot;@xmlns&quot;:&quot;http://fin-dev-www-2.adminsys.mrll.com:8005/webservices/rest/xxsp_mapping_svc/salesreps&quot;,&quot;RESTHeader&quot;:{&quot;@xmlns&quot;:&quot;http://fin-dev-www-2.adminsys.mrll.com:8005/webservices/rest/xxsp_mapping_svc/header&quot;,&quot;RespApplication&quot;:&quot;PA&quot;,&quot;SecurityGroup&quot;:&quot;STANDARD&quot;,&quot;NLSLanguage&quot;:&quot;AMERICAN&quot;},&quot;InputParameters&quot;:{&quot;P_IN_SALESREP_REC&quot;:{&quot;OPERATING_UNIT_ID&quot;:150}}}}" doc:name="Set Payload"/>
+        <http:request config-ref="HC_ORACLE_HTTP_Request_Configuration" path="${hc.oracle.salesrepids.path}" method="POST" doc:name="GET_Oracle_SalesRep_Ids">
+            <http:request-builder>
+                <http:header headerName="Cookie" value="#[flowVars.oracleAuth.tokenName + '=' + flowVars.oracleAuth.accessToken]"/>
+                <http:header headerName="Content-Type" value="application/json"/>
+            </http:request-builder>
+        </http:request>
+        <byte-array-to-object-transformer doc:name="Byte Array to Object"/>
+        <logger message="#[payload]" level="DEBUG" doc:name="[DEBUG] Log Response From Oracle"/>
+        <flow-ref name="SET_HTTP_Response" doc:name="SET_HTTP_Response"/>
+        <exception-strategy ref="global-exception-strategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <flow name="GET_Health_DSO" processingStrategy="synchronous">
+        <flow-ref name="GET_DSOAuth" doc:name="GET_DSOAuth"/>
+        <logger message="Received DSO Auth" level="DEBUG" doc:name="[DEBUG] Received DSO Auth"/>
+        <set-variable variableName="currentDate" value="#[server.dateTime.plusDays(-1).format(&quot;MM-dd-yyyy&quot;)]" doc:name="Variable"/>
+		<http:request config-ref="HC_DSO_API_HTTP_Request_Configuration" path="${hc.dso.api.project.path}" method="GET" doc:name="Dso_GetProject">
+            <http:request-builder>
+                <http:query-param paramName="billingDay" value="#[flowVars.currentDate]"/>
+                <http:header headerName="Authorization" value="Bearer #[flowVars.dsoToken]"/>
+            </http:request-builder>
+        </http:request>
+        <byte-array-to-object-transformer doc:name="Byte Array to Object"/>
+        <logger message="#[payload]" level="DEBUG" doc:name="[DEBUG] Log Response"/>
+        <flow-ref name="SET_HTTP_Response" doc:name="SET_HTTP_Response"/>
+        <exception-strategy ref="global-exception-strategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+</mule>

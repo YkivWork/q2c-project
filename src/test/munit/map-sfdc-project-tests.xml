@@ -1,0 +1,179 @@
+<?xml version='1.0' encoding='UTF-8'?>
+
+<mule xmlns:dw='http://www.mulesoft.org/schema/mule/ee/dw'
+      xmlns:mock='http://www.mulesoft.org/schema/mule/mock'
+      xmlns:munit='http://www.mulesoft.org/schema/mule/munit'
+      xmlns:json='http://www.mulesoft.org/schema/mule/json'
+      xmlns:scripting='http://www.mulesoft.org/schema/mule/scripting'
+      xmlns='http://www.mulesoft.org/schema/mule/core'
+      xmlns:doc='http://www.mulesoft.org/schema/mule/documentation'
+      xmlns:spring='http://www.springframework.org/schema/beans'
+      xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'
+      xsi:schemaLocation='http://www.mulesoft.org/schema/mule/mock http://www.mulesoft.org/schema/mule/mock/current/mule-mock.xsd
+http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd'>
+    <munit:config name='munit' doc:name='MUnit configuration'/>
+
+    <spring:beans>
+        <spring:import resource='classpath:proc-merrillcorp-project/mapsfdcproject.xml'/>
+        <spring:import resource='classpath:sys-sfdc/getdatasiteonecompany.xml'/>
+        <spring:import resource='classpath:sys-sfdc/getbillingbyid.xml'/>
+        <spring:import resource='classpath:sys-sfdc/getbillingcompanybyid.xml'/>
+        <spring:import resource='classpath:globals.xml'/>
+    </spring:beans>
+
+    <scripting:script name='buildProjectPayload' engine='groovy'>
+        [
+          'Active_Date__c': '2017-01-01',
+          'Admin_Email__c': 'first@last.com',
+          'Aria_Account_Creation__c': 'OK',
+          'Billing_Effective_Date__c': '2017-01-01',
+          'Business_Unit__c': 'BU',
+          'Closure_Media_Included__c': 'No',
+          'Continuation_of_Services_Date__c': '2017-01-01',
+          'Continuation_Rate__c': '2.0',
+          'Continuation_Rate_Special_Media__c': '2.1',
+          'Contract_Customer__c': 'Acme',
+          'Contract_Term__c': '1.0',
+          'Country_of_Issuer__c': 'US',
+          'CreatedDate': '2017-01-01',
+          'CurrencyIsoCode': 'USD',
+          'Datacenter__c': 'Place X',
+          'DatasiteOne_ProjectID__c': 'abc-123',
+          'Hibernation_Rate__c': '3.0',
+          'Hibernation_Rate_Special_Media__c': '3.1',
+          'Legal_Entity__c': '010-Acme',
+          'Minimum_Fee__c': '100.0',
+          'LastModifiedDate': '2017-01-01',
+          'Name': 'Acme',
+          'Operating_Unit_ID__c': '010-Acme',
+          'Operating_Unit_Name__c': '010-Acme',
+          'Primary_Service_Site__c': 'Acme',
+          'Product_Type__c': 'Acme',
+          'Project_Create_Date__c': '2017-01-01',
+          'Salesforce_ProjectID__c': 'abc-123',
+          'Project_Status__c': 'Active',
+          'Retro_Start_Date_Test_Only_Manual__c': '2017-01-01',
+          'Revenue_Site__c': 'USD-010',
+          'Sales__c': 'Yes please',
+          'Special_Media_Rate__c': '.32',
+          'Tier_1_Rate_Value__c': '',
+          'Tier_1_Upper_Level_Limit__c': '',
+          'Tier_2_Rate_Value__c': '',
+          'Tier_2_Upper_Level_Limit__c': '',
+          'Tier_3_Rate_Value__c': '',
+          'Tier_3_Upper_Level_Limit__c': '',
+          'Tier_4_Rate_Value__c': '',
+          'Tier_4_Upper_Level_Limit__c': '',
+          'Tier_5_Rate_Value__c': '',
+          'Tier_5_Upper_Level_Limit__c': '',
+          'Tier_6_Rate_Value__c': '',
+          'Tier_6_Upper_Level_Limit__c': '',
+          'Tier_7_Rate_Value__c': '',
+          'Tier_7_Upper_Level_Limit__c': '',
+          'Tier_8_Rate_Value__c': '',
+          'Tier_8_Upper_Level_Limit__c': '',
+          'Tier_9_Rate_Value__c': '',
+          'Tier_9_Upper_Level_Limit__c': '',
+          'Tier_10_Rate_Value__c': '',
+          'Unit_of_Measure__c': 'Page'
+        ]
+    </scripting:script>
+
+    <scripting:script name='buildDSOCompany' engine='groovy'>
+        [
+          'Customer_Order_Number__c': 'po-number',
+          'Email_Address__c': 'first@last.com',
+          'First_Name__c': 'First',
+          'Last_Name__c': 'Last',
+          'Name': 'Acme',
+          'Id': 'abc-123',
+          'Phone__c': '123-456-7890'
+        ]
+    </scripting:script>
+
+    <munit:test name="upsertProjCanHandleEmptyResult" description="Test">
+        <mock:when messageProcessor="mule:flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="GET_DATASITEONE_COMPANY"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[resultOfScript('buildDSOCompany')]" mimeType="application/java"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="GET_BILLING_BY_ID"/>
+            </mock:with-attributes>
+            <mock:then-return payload="{&quot;id&quot; : &quot;a_project_from_ds1&quot;}" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="GET_BILLING_COMPANY_BY_ID"/>
+            </mock:with-attributes>
+            <mock:then-return payload="{&quot;id&quot; : &quot;a_project_from_ds1&quot;}" mimeType="application/json"/>
+        </mock:when>
+
+        <munit:set payload="#[resultOfScript('buildProjectPayload')]" mimeType="application/java"/>
+
+        <flow-ref name="mapSFDCProject" doc:name="mapSFDCProject"/>
+
+        <json:json-to-object-transformer returnClass="java.lang.Object" doc:name="JSON to Object"/>
+
+        <munit:assert-on-equals message="activeDate is invalid" expectedValue="2017-01-01" actualValue="#[payload.activeDate]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="adminEmail is invalid" expectedValue="first@last.com" actualValue="#[payload.adminEmail]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="ariaCreation is invalid" expectedValue="OK" actualValue="#[payload.ariaCreation]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="billingEffectiveDate is invalid" expectedValue="2017-01-01" actualValue="#[payload.billingEffectiveDate]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="businessUnit is invalid" expectedValue="BU" actualValue="#[payload.businessUnit]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="closureMediaInclude is invalid" expectedValue="No" actualValue="#[payload.closureMediaInclude]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="continuationDate is invalid" expectedValue="2017-01-01" actualValue="#[payload.continuationDate]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="continuationRate is invalid" expectedValue="2.0" actualValue="#[payload.continuationRate]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="continuationRateSM is invalid" expectedValue="2.1" actualValue="#[payload.continuationRateSM]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="contractCustomer is invalid" expectedValue="Acme" actualValue="#[payload.contractCustomer]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="contractTerm is invalid" expectedValue="1.0" actualValue="#[payload.contractTerm]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="countryOfIssuer is invalid" expectedValue="US" actualValue="#[payload.countryOfIssuer]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="createdAt is invalid" expectedValue="2017-01-01" actualValue="#[payload.createdAt]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="currency is invalid" expectedValue="USD" actualValue="#[payload.currency]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="dataCenter is invalid" expectedValue="Place X" actualValue="#[payload.dataCenter]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="datasiteOneId is invalid" expectedValue="abc-123" actualValue="#[payload.datasiteOneId]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="hibernationRate is invalid" expectedValue="3.0" actualValue="#[payload.hibernationRate]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="hibernationRateSM is invalid" expectedValue="3.1" actualValue="#[payload.hibernationRateSM]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="legalEntity is invalid" expectedValue="010-Acme" actualValue="#[payload.legalEntity]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="minimumFee is invalid" expectedValue="100.0" actualValue="#[payload.minimumFee]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="modifiedAt is invalid" expectedValue="2017-01-01" actualValue="#[payload.modifiedAt]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="name is invalid" expectedValue="Acme" actualValue="#[payload.name]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="operatingUnitId is invalid" expectedValue="010-Acme" actualValue="#[payload.operatingUnitId]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="operatingUnitName is invalid" expectedValue="010-Acme" actualValue="#[payload.operatingUnitName]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="primaryServiceSite is invalid" expectedValue="Acme" actualValue="#[payload.primaryServiceSite]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="productType is invalid" expectedValue="Acme" actualValue="#[payload.productType]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="payloadCreateDate is invalid" expectedValue="2017-01-01" actualValue="#[payload.payloadCreateDate]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="projectSfdcId is invalid" expectedValue="abc-123" actualValue="#[payload.projectSfdcId]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="projectStatus is invalid" expectedValue="Active" actualValue="#[payload.projectStatus]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="retroStartDate is invalid" expectedValue="2017-01-01" actualValue="#[payload.retroStartDate]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="revenueSite is invalid" expectedValue="USD-010" actualValue="#[payload.revenueSite]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="sales is invalid" expectedValue="Yes please" actualValue="#[payload.sales]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="specialMediaRate is invalid" expectedValue=".32" actualValue="#[payload.specialMediaRate]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="tier1Rate is invalid" expectedValue="#['']" actualValue="#[payload.tier1Rate]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="tier1UpperLimit is invalid" expectedValue="#['']" actualValue="#[payload.tier1UpperLimit]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="tier2Rate is invalid" expectedValue="#['']" actualValue="#[payload.tier2Rate]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="tier2UpperLimit is invalid" expectedValue="#['']" actualValue="#[payload.tier2UpperLimit]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="tier3Rate is invalid" expectedValue="#['']" actualValue="#[payload.tier3Rate]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="tier3UpperLimit is invalid" expectedValue="#['']" actualValue="#[payload.tier3UpperLimit]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="tier4Rate is invalid" expectedValue="#['']" actualValue="#[payload.tier4Rate]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="tier4UpperLimit is invalid" expectedValue="#['']" actualValue="#[payload.tier4UpperLimit]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="tier5Rate is invalid" expectedValue="#['']" actualValue="#[payload.tier5Rate]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="tier5UpperLimit is invalid" expectedValue="#['']" actualValue="#[payload.tier5UpperLimit]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="tier6Rate is invalid" expectedValue="#['']" actualValue="#[payload.tier6Rate]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="tier6UpperLimit is invalid" expectedValue="#['']" actualValue="#[payload.tier6UpperLimit]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="tier7Rate is invalid" expectedValue="#['']" actualValue="#[payload.tier7Rate]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="tier7UpperLimit is invalid" expectedValue="#['']" actualValue="#[payload.tier7UpperLimit]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="tier8Rate is invalid" expectedValue="#['']" actualValue="#[payload.tier8Rate]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="tier8UpperLimit is invalid" expectedValue="#['']" actualValue="#[payload.tier8UpperLimit]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="tier9Rate is invalid" expectedValue="#['']" actualValue="#[payload.tier9Rate]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="tier9UpperLimit is invalid" expectedValue="#['']" actualValue="#[payload.tier9UpperLimit]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="tier1Rate is invalid" expectedValue="#['']" actualValue="#[payload.tier1Rate]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="unitOfMeasure is invalid" expectedValue="Page" actualValue="#[payload.unitOfMeasure]" doc:name="Assert Equals"/>
+    </munit:test>
+</mule>

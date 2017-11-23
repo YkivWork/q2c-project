@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd">
+    <flow name="GET_BILLING_COMPANY_BY_ID" processingStrategy="synchronous">
+        <vm:inbound-endpoint exchange-pattern="request-response" path="VM_GET_BILLING_COMPANY_BY_ID" connector-ref="VM_IN_MEMORY" doc:name="VM_GET_BILLING_COMPANY_BY_ID"/>
+        <logger message="Get Billing Company Payload: #[payload]" level="DEBUG" category="GET_BILLING_COMPANY_ID" doc:name="[DEBUG]Log Billing Company ID Request Payload"/>
+        <dw:transform-message doc:name="Transform to Java Object">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <set-variable variableName="billingCompanyId" value="#[payload.id]" doc:name="Flow Var Billing Company Id"/>
+        <logger message="Billing Company Id: #[payload]" level="DEBUG" category="GET_BILLING_COMPANY_BY_ID" doc:name="[DEBUG]Log Payload"/>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Name,Id,Oracle_ID__c,VAT__c FROM Billing_Company__c WHERE Id = '#[flowVars.billingCompanyId]'" doc:name="Salesforce"/>
+        <choice doc:name="Choice">
+            <when expression="#[payload.size() &gt; 0]">
+                <json:object-to-json-transformer mimeType="application/json" doc:name="Object to JSON"/>
+            </when>
+            <otherwise>
+                <logger message="Not Records returned for #[flowVars.billingCompanyId]" level="DEBUG" category="GET_BILLING_COMPANY_ID" doc:name="[DEBUG]Log Empty Payload"/>
+                <set-payload value="{}" mimeType="application/json" doc:name="Set to Empty Payload"/>
+            </otherwise>
+        </choice>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="#[exception.getSummaryMessage()]" level="ERROR" category="GET_BILLING_COMPANY_BY_ID" doc:name="Log Exception"/>
+            <set-payload value="Unabled to retrieve billing company by id: #[flowVars.billingCompanyId]" doc:name="Set Payload"/>
+            <set-property doc:name="400" propertyName="http.status" value="#[400]"/>
+        </catch-exception-strategy>
+    </flow>
+</mule>

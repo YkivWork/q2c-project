@@ -1,0 +1,530 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting"
+	xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+
+    <sub-flow name="createPROJMdrXRefs">
+
+        <logger message="We need to *CREATE* the records, *NOT* update." category="com.merrillcorp.q2c" level="DEBUG" doc:name="Logger"/>
+
+        <enricher target="variable:billingAddressXRefResult" doc:name="Message Enricher">
+            <flow-ref name="addBillAddrToSfProjXRefFlow" doc:name="addBillAddrToSfProjXRefFlow"/>
+        </enricher>
+        <enricher target="variable:billingCompanyXRefResult" doc:name="Message Enricher">
+            <flow-ref name="addBillCoToSfProjXRefFlow" doc:name="addBillCoToSfProjXRefFlow"/>
+        </enricher>
+        <enricher target="variable:oracleSiteXRef" doc:name="Message Enricher">
+            <flow-ref name="addOraSiteToSfProjXRefFlow" doc:name="addOraSiteToSfProjXRefFlow"/>
+        </enricher>
+        <enricher target="variable:oracleAccountXRef" doc:name="Message Enricher">
+            <flow-ref name="addOraAcctToSfProjXRefFlow" doc:name="addOraAcctToSfProjXRefFlow"/>
+        </enricher>
+    </sub-flow>
+
+    <sub-flow name="updatePROJMdrXRefs">
+        <logger message="NOT IMPLEMENTED: We need to *UPDATE* the MDR records, *NOT* create." category="com.merrillcorp.q2c" level="DEBUG" doc:name="Logger"/>
+    </sub-flow>
+
+    <sub-flow name="addBillCoToSfProjXRefFlow" >
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%function inActiveDate() (flowVars.theProject.createdAt as :date) as :string {format: 'yyyy-MM-dd'}
+---
+{
+  entity_type_key: "PROJ",
+  
+  on_id_type_key: "SF_PROJ",
+  on_id_value: flowVars.theProject.projectSfdcId,
+  
+  add_id_type_key: "SF_BILLCO",
+  add_id_value: flowVars.theCompany.billingCompany.sfdcId,
+
+  add_qualifier1_key: "VAT",
+  add_qualifier1_value: flowVars.theCompany.billingCompany.vatRegistration,
+  
+  (add_start_date: (flowVars.setMdrStartDate as :date) as :string {format: 'yyyy-MM-dd'}) when flowVars.setMdrStartDate != null,
+  (add_end_date: inActiveDate()) when flowVars.setMdrEndDate default false
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <logger message="system=MDR method=PROJ:SF_BILLCO action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" category="com.merrillcorp.q2c" level="INFO" doc:name="Logger"/>
+        <logger message="system=MDR method=PROJ:SF_BILLCO action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="setPayloadBeforeUntilSuccess"/>
+        <until-successful maxRetries="${mdr.http.max.retries}" millisBetweenRetries="${mdr.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful">
+            <http:request config-ref="mdrSystemRequestConfiguration" path="${mdr.crossref.path}" method="POST" doc:name="Post MDR XRef"/>
+        </until-successful>
+
+        <logger message="system=MDR method=PROJ:SF_BILLCO action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" category="com.merrillcorp.q2c" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+
+    <sub-flow name="addBillAddrToSfProjXRefFlow">
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%function inActiveDate() (flowVars.theProject.createdAt as :date) as :string {format: 'yyyy-MM-dd'}
+---
+{
+  entity_type_key: "PROJ",
+  
+  on_id_type_key: "SF_PROJ",
+  on_id_value: flowVars.theProject.projectSfdcId,
+
+  add_id_type_key: "SF_BILLADDR",
+  add_id_value: flowVars.sfBillAddrInactivate.sfdcId when flowVars.sfBillAddrInactivate != null otherwise flowVars.theCompany.billingAddress.sfdcId,
+
+  add_qualifier1_key: "OPERUNIT",
+  add_qualifier1_value: flowVars.theProject.operatingUnitName,
+  
+  (add_start_date: (flowVars.setMdrStartDate as :date) as :string {format: 'yyyy-MM-dd'}) when flowVars.setMdrStartDate != null,
+  (add_end_date: inActiveDate()) when flowVars.setMdrEndDate default false
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <logger message="system=MDR method=PROJ:SF_BILLADDR action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" category="com.merrillcorp.q2c" level="INFO" doc:name="Logger"/>
+        <logger message="system=MDR method=PROJ:SF_BILLADDR action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="setPayloadBeforeUntilSuccess"/>
+        <until-successful maxRetries="${mdr.http.max.retries}" millisBetweenRetries="${mdr.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful">
+            <http:request config-ref="mdrSystemRequestConfiguration" path="${mdr.crossref.path}" method="POST" doc:name="Post MDR XRef"/>
+        </until-successful>
+
+        <logger message="system=MDR method=PROJ:SF_BILLADDR action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" category="com.merrillcorp.q2c" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+
+    <sub-flow name="addOraAcctToSfProjXRefFlow">
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%function inActiveDate() (flowVars.theProject.createdAt as :date) as :string {format: 'yyyy-MM-dd'}
+---
+{
+  entity_type_key: "PROJ",
+  on_id_type_key: "SF_PROJ",
+  on_id_value: flowVars.theProject.projectSfdcId,
+
+  add_id_type_key: "ORA_ACCT",
+  add_id_value: flowVars.theCompany.billingCompany.oracleAccountId
+  	when flowVars.theCompany.billingCompany.oracleAccountId != null
+  	otherwise flowVars.oraAcctInactivate[0].oraId,
+
+  add_qualifier1_key: "VAT",
+  add_qualifier1_value: flowVars.theCompany.billingCompany.vatRegistration,
+  
+  (add_start_date: (flowVars.setMdrStartDate as :date) as :string {format: 'yyyy-MM-dd'}) when flowVars.setMdrStartDate != null,
+  (add_end_date: inActiveDate()) when flowVars.setMdrEndDate default false
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <logger message="system=MDR method=PROJ:ORA_ACCT action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" category="com.merrillcorp.q2c" level="INFO" doc:name="Logger"/>
+        <logger message="system=MDR method=PROJ:ORA_ACCT action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="setPayloadBeforeUntilSuccess"/>
+        <until-successful maxRetries="${mdr.http.max.retries}" millisBetweenRetries="${mdr.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful">
+            <http:request config-ref="mdrSystemRequestConfiguration" path="${mdr.crossref.path}" method="POST" doc:name="Post MDR XRef"/>
+        </until-successful>
+
+        <logger message="system=MDR method=PROJ:ORA_ACCT action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" category="com.merrillcorp.q2c" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+
+    <sub-flow name="addOraSiteToSfProjXRefFlow">
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%function inActiveDate() (flowVars.theProject.createdAt as :date) as :string {format: 'yyyy-MM-dd'}
+---
+{
+  entity_type_key: "PROJ",
+  on_id_type_key: "SF_PROJ",
+  on_id_value: flowVars.theProject.projectSfdcId,
+
+  add_id_type_key: "ORA_SITE",
+  add_id_value: flowVars.oraSiteInactivate.oraSiteId 
+  	when flowVars.oraSiteInactivate != null
+  	otherwise flowVars.theCompany.billingAddress.oracleSiteId,
+
+  add_qualifier1_key: "OPERUNIT",
+  add_qualifier1_value: flowVars.theProject.operatingUnitName,
+  
+  (add_start_date: (flowVars.setMdrStartDate as :date) as :string {format: 'yyyy-MM-dd'}) when flowVars.setMdrStartDate != null,
+  (add_end_date: inActiveDate()) when flowVars.setMdrEndDate default false
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <logger message="system=MDR method=PROJ:ORA_SITE action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" category="com.merrillcorp.q2c" level="INFO" doc:name="Logger"/>
+        <logger message="system=MDR method=PROJ:ORA_SITE action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="setPayloadBeforeUntilSuccess"/>
+        <until-successful maxRetries="${mdr.http.max.retries}" millisBetweenRetries="${mdr.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful">
+            <http:request config-ref="mdrSystemRequestConfiguration" path="${mdr.crossref.path}" method="POST" doc:name="Post MDR XRef"/>
+        </until-successful>
+
+        <logger message="system=MDR method=PROJ:ORA_SITE action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" category="com.merrillcorp.q2c" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+
+    <sub-flow name="addAriaAcctToSfProjXRefFlow">
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%function inActiveDate() (flowVars.theProject.createdAt as :date) as :string {format: 'yyyy-MM-dd'}
+---
+{
+  entity_type_key: "PROJ",
+
+  on_id_type_key: "SF_PROJ",
+  on_id_value: flowVars.theProject.projectSfdcId,
+
+  add_id_type_key: "Aria_Acct",
+  add_id_value: flowVars.ariaResponse.accountNumber,
+
+  add_qualifier1_key: "CURRENCY",
+  add_qualifier1_value: flowVars.theProject.currency,
+
+  add_qualifier2_key: "LEGALENT",
+  add_qualifier2_value: flowVars.theProject.legalEntity,
+
+  (add_start_date: (flowVars.setMdrStartDate as :date) as :string {format: 'yyyy-MM-dd'}) when flowVars.setMdrStartDate != null,
+  (add_end_date: inActiveDate()) when flowVars.setMdrEndDate default false
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <logger message="system=MDR method=PROJ:Aria_Acct action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" category="com.merrillcorp.q2c" level="INFO" doc:name="Logger"/>
+        <logger message="system=MDR method=PROJ:Aria_Acct action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="setPayloadBeforeUntilSuccess"/>
+        <until-successful maxRetries="${mdr.http.max.retries}" millisBetweenRetries="${mdr.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful">
+            <http:request config-ref="mdrSystemRequestConfiguration" path="${mdr.crossref.path}" method="POST" doc:name="Post MDR XRef"/>
+        </until-successful>
+
+        <logger message="system=MDR method=PROJ:Aria_Acct action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" category="com.merrillcorp.q2c" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+
+    <sub-flow name="addAriaAcctToSfBillCoXRefFlow">
+
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%function inActiveDate() (flowVars.theProject.createdAt as :date) as :string {format: 'yyyy-MM-dd'}
+---
+{
+  entity_type_key: "ORG",
+
+  on_id_type_key: "SF_BILLCO",
+  on_id_value: flowVars.theCompany.billingCompany.sfdcId,
+
+  on_qualifier1_key: "VAT",
+  on_qualifier1_value: flowVars.theCompany.billingCompany.vatRegistration,
+
+  add_id_type_key: "Aria_Acct",
+  add_id_value: flowVars.ariaResponse.accountNumber,
+
+  add_qualifier1_key: "CURRENCY",
+  add_qualifier1_value: flowVars.theProject.currency,
+
+  add_qualifier2_key: "LEGALENT",
+  add_qualifier2_value: flowVars.theProject.legalEntity,
+
+  (add_start_date: (flowVars.setMdrStartDate as :date) as :string {format: 'yyyy-MM-dd'}) when flowVars.setMdrStartDate != null,
+  (add_end_date: inActiveDate()) when flowVars.setMdrEndDate default false
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <logger message="system=MDR method=ORG:Aria_Acct action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" category="com.merrillcorp.q2c" level="INFO" doc:name="Logger"/>
+        <logger message="system=MDR method=ORG:Aria_Acct action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="setPayloadBeforeUntilSuccess"/>
+        <until-successful maxRetries="${mdr.http.max.retries}" millisBetweenRetries="${mdr.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful">
+            <http:request config-ref="mdrSystemRequestConfiguration" path="${mdr.crossref.path}" method="POST" doc:name="Post MDR XRef"/>
+        </until-successful>
+
+        <logger message="system=MDR method=ORG:Aria_Acct action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" category="com.merrillcorp.q2c" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+
+    <sub-flow name="addAriaMpiToSfProjectFlow">
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%function inActiveDate() (flowVars.theProject.createdAt as :date) as :string {format: 'yyyy-MM-dd'}
+---
+{
+  entity_type_key: "PROJ",
+
+  on_id_type_key: "SF_PROJ",
+  on_id_value: flowVars.theProject.projectSfdcId,
+
+  add_id_type_key: "Aria_MPI",
+  add_id_value: flowVars.ariaResponse.planInstanceNumber,
+
+  add_qualifier1_key: "ARIAACCT",
+  add_qualifier1_value: flowVars.ariaResponse.accountNumber,
+
+  (add_start_date: (flowVars.setMdrStartDate as :date) as :string {format: 'yyyy-MM-dd'}) when flowVars.setMdrStartDate != null,
+  (add_end_date: inActiveDate()) when flowVars.setMdrEndDate default false
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <logger message="system=MDR method=PROJ:Aria_MPI action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" category="com.merrillcorp.q2c" level="INFO" doc:name="Logger"/>
+        <logger message="system=MDR method=PROJ:Aria_MPI action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="setPayloadBeforeUntilSuccess"/>
+        <until-successful maxRetries="${mdr.http.max.retries}" millisBetweenRetries="${mdr.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful">
+            <http:request config-ref="mdrSystemRequestConfiguration" path="${mdr.crossref.path}" method="POST" doc:name="Post MDR XRef"/>
+        </until-successful>
+
+        <logger message="system=MDR method=PROJ:Aria_MPI action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" category="com.merrillcorp.q2c" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+
+    <sub-flow name="createORGADDR:ORA_SITE">
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+  entity_type_key: "ORGADDR",
+  
+  on_id_type_key: "SF_BILLADDR",
+  on_id_value: flowVars.theCompany.billingAddress.sfdcId,
+
+  on_qualifier1_key: "OPERUNIT",
+  on_qualifier1_value: flowVars.theProject.operatingUnitName,
+  
+  add_id_type_key: "ORA_SITE",
+  add_id_value: flowVars.theCompany.billingAddress.oracleSiteId,
+
+  add_qualifier1_key: "OPERUNIT",
+  add_qualifier1_value: flowVars.theProject.operatingUnitName
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <logger message="system=MDR method=ORGADDR:ORA_SITE action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <logger message="system=MDR method=ORGADDR:ORA_SITE action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" category="com.merrillcorp.q2c" level="DEBUG" doc:name="Logger"/>
+
+        <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="setPayloadBeforeUntilSuccess"/>
+        <until-successful maxRetries="${mdr.http.max.retries}" millisBetweenRetries="${mdr.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful">
+            <http:request config-ref="mdrSystemRequestConfiguration" path="${mdr.crossref.path}" method="POST" doc:name="Post MDR XRef"/>
+        </until-successful>
+
+        <logger message="system=MDR method=ORGADDR:ORA_SITE action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" category="com.merrillcorp.q2c" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+
+    <sub-flow name="createORGADDR:ORA_ACCT">
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+  entity_type_key: "ORGADDR",
+  
+  on_id_type_key: "SF_BILLADDR",
+  on_id_value: flowVars.theCompany.billingAddress.sfdcId,
+
+  on_qualifier1_key: "OPERUNIT",
+  on_qualifier1_value: flowVars.theProject.operatingUnitName,
+
+  add_id_type_key: "ORA_ACCT",
+  add_id_value: flowVars.theCompany.billingCompany.oracleAccountId,
+
+  add_qualifier1_key: "VAT",
+  add_qualifier1_value: flowVars.theCompany.billingCompany.vatRegistration
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <logger message="system=MDR method=ORGADDR:ORA_ACCT action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <logger message="system=MDR method=ORGADDR:ORA_ACCT action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" category="com.merrillcorp.q2c" level="DEBUG" doc:name="Logger"/>
+        <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="setPayloadBeforeUntilSuccess"/>
+        <until-successful maxRetries="${mdr.http.max.retries}" millisBetweenRetries="${mdr.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful">
+            <http:request config-ref="mdrSystemRequestConfiguration" path="${mdr.crossref.path}" method="POST" doc:name="Post MDR XRef"/>
+        </until-successful>
+
+        <logger message="system=MDR method=ORGADDR:ORA_ACCT action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" category="com.merrillcorp.q2c" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+
+    <sub-flow name="createORGADDR:SF_BILLCO">
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+  entity_type_key: "ORGADDR",
+  
+  on_id_type_key: "SF_BILLADDR",
+  on_id_value: flowVars.theCompany.billingAddress.sfdcId,
+
+  on_qualifier1_key: "OPERUNIT",
+  on_qualifier1_value: flowVars.theProject.operatingUnitName,
+
+  add_id_type_key: "SF_BILLCO",
+  add_id_value: flowVars.theCompany.billingCompany.sfdcId,
+
+  add_qualifier1_key: "VAT",
+  add_qualifier1_value: flowVars.theCompany.billingCompany.vatRegistration
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <logger message="system=MDR method=ORGADDR:SF_BILLCO action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" category="com.merrillcorp.q2c" level="INFO" doc:name="Logger"/>
+        <logger message="system=MDR method=ORGADDR:SF_BILLCO action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="setPayloadBeforeUntilSuccess"/>
+        <until-successful maxRetries="${mdr.http.max.retries}" millisBetweenRetries="${mdr.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful">
+            <http:request config-ref="mdrSystemRequestConfiguration" path="${mdr.crossref.path}" method="POST" doc:name="Post MDR XRef"/>
+        </until-successful>
+
+        <logger message="system=MDR method=ORGADDR:SF_BILLCO action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" category="com.merrillcorp.q2c" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+
+    <sub-flow name="createORG:ORA_ACCT">
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+  entity_type_key: "ORG",
+  
+  on_id_type_key: "SF_BILLCO",
+  on_id_value: flowVars.theCompany.billingCompany.sfdcId,
+
+  on_qualifier1_key: "VAT",
+  on_qualifier1_value: flowVars.theCompany.billingCompany.vatRegistration,
+
+  add_id_type_key: "ORA_ACCT",
+  add_id_value: flowVars.theCompany.billingCompany.oracleAccountId,
+  
+  add_qualifier1_key: "VAT",
+  add_qualifier1_value: flowVars.theCompany.billingCompany.vatRegistration
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <logger message="system=MDR method=ORG:ORA_ACCT action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" category="com.merrillcorp.q2c" level="INFO" doc:name="Logger"/>
+        <logger message="system=MDR method=ORG:ORA_ACCT action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="setPayloadBeforeUntilSuccess"/>
+        <until-successful maxRetries="${mdr.http.max.retries}" millisBetweenRetries="${mdr.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful">
+            <http:request config-ref="mdrSystemRequestConfiguration" path="${mdr.crossref.path}" method="POST" doc:name="Post MDR XRef"/>
+        </until-successful>
+
+        <logger message="system=MDR method=ORG:ORA_ACCT action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" category="com.merrillcorp.q2c" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+
+    <sub-flow name="createPROJ:DS1_PROJ">
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+  entity_type_key: "PROJ",
+  on_id_type_key: "SF_PROJ",
+  on_id_value: flowVars.theProject.projectSfdcId,
+
+  add_id_type_key: "DS1_PROJ",
+  add_id_value: flowVars.DSOCreateProjectResponse.id
+
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <logger message="system=MDR method=PROJ:DS1_PROJ action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" category="com.merrillcorp.q2c" level="INFO" doc:name="Logger"/>
+        <logger message="system=MDR method=PROJ:DS1_PROJ action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="Session Variable"/>
+        <until-successful maxRetries="${mdr.http.max.retries}" millisBetweenRetries="${mdr.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful">
+            <http:request config-ref="mdrSystemRequestConfiguration" path="${mdr.crossref.path}" method="POST" doc:name="Post MDR XRef"/>
+        </until-successful>
+
+        <logger message="system=MDR method=PROJ:DS1_PROJ action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" category="com.merrillcorp.q2c" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+
+    <flow name="getXRefForSFDCProjectFlow" processingStrategy="synchronous">
+        <logger message="system=MDR method=GetXRefForProj action=request projectId=#[flowVars.projectId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <until-successful maxRetries="${mdr.http.max.retries}" millisBetweenRetries="${mdr.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful">
+            <http:request config-ref="mdrSystemRequestConfiguration" path="${mdr.crossref.path}" method="GET" doc:name="HTTP">
+                <http:request-builder>
+                    <http:query-param paramName="entity_type_key" value="PROJ"/>
+                    <http:query-param paramName="id_type_key" value="SF_PROJ"/>
+                    <http:query-param paramName="id_value" value="#[flowVars.theProject.projectSfdcId]"/>
+                    <http:query-param paramName="include_deleted_cross_ref" value="0"/>
+                </http:request-builder>
+            </http:request>
+        </until-successful>
+
+        <set-payload value="#[dw('payload', 'application/java')]" doc:name="Set Payload"/>
+
+        <logger message="system=MDR method=GetXRefForProj action=response projectId=#[flowVars.projectId] recordCount=#[payload.size()]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <logger message="system=MDR method=GetXRefForProj action=response projectId=#[flowVars.projectId] payload=#[message.payloadAs(java.lang.String)]" category="com.merrillcorp.q2c" level="DEBUG" doc:name="Logger"/>
+
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="getXRefForSFDCProjectFlow: #[exception.getSummaryMessage()]" level="ERROR" doc:name="Logger"/>
+        </catch-exception-strategy>
+    </flow>
+
+    <sub-flow name="getXRefForOrgFlow">
+        <logger message="system=MDR method=GetXRefForOrg action=request projectId=#[flowVars.projectId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <until-successful maxRetries="${mdr.http.max.retries}" millisBetweenRetries="${mdr.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful">
+            <http:request config-ref="mdrSystemRequestConfiguration" path="${mdr.crossref.path}" method="GET" doc:name="HTTP">
+                <http:request-builder>
+                    <http:query-param paramName="entity_type_key" value="ORG"/>
+                    <http:query-param paramName="id_type_key" value="SF_BILLCO"/>
+                    <http:query-param paramName="id_value" value="#[flowVars.theCompany.billingCompany.sfdcId]"/>
+                    <http:query-param paramName="qualifier1_key" value="VAT"/>
+                    <http:query-param paramName="qualifier1_value" value="#[flowVars.theCompany.billingCompany.vatRegistration]"/>
+                    <http:query-param paramName="include_deleted_cross_ref" value="0"/>
+                </http:request-builder>
+            </http:request>
+        </until-successful>
+
+        <set-payload value="#[dw('payload', 'application/java')]" doc:name="Set Payload"/>
+
+        <logger message="system=MDR method=GetXRefForOrg action=response projectId=#[flowVars.projectId] recordCount=#[payload.size()]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <logger message="system=MDR method=GetXRefForOrg action=response projectId=#[flowVars.projectId] payload=#[message.payloadAs(java.lang.String)]" category="com.merrillcorp.q2c" level="DEBUG" doc:name="Logger"/>
+
+    </sub-flow>
+
+    <sub-flow name="matchAriaValues">
+        <logger message="flow=matchAriaValues action=started projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+
+%var currency = log('Looking for currency: ', flowVars.theProject.currency)
+%var legalEntity = log('Looking for legalEntity: ', flowVars.theProject.legalEntity)
+
+%var ariaFoundResults = flowVars.upsertOrgResponse[?(
+  $.Qualifier1Key == 'CURRENCY' and $.Qualifier1Value == currency and
+  $.Qualifier2Key == 'LEGALENT' and $.Qualifier2Value == legalEntity
+)] default []
+
+%var ariaAcct = ariaFoundResults[0].IdentifierValue
+
+%var ariaMpi = flowVars.upsertSfdcProjResponse[?(
+ $.Qualifier1Key == 'ARIAACCT' and
+ $.EntityTypeKey == 'PROJ' and
+ $.Qualifier1Value == ariaAcct)][0].IdentifierValue when ( ariaAcct != null ) otherwise null
+---
+{
+  ariaAcct: ariaAcct,
+  ariaMPI: ariaMpi
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <logger message="flow=matchAriaValues action=completed projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+    </sub-flow>
+</mule>

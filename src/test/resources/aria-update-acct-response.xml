@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns1="urn:client:api:wsdl:document/literal_wrapped:vers:11.0:aria_complete_m_api">
+    <SOAP-ENV:Body>
+        <ns1:update_acct_plan_status_mResponseElement>
+            <ns1:error_code>0</ns1:error_code>
+            <ns1:error_msg>OK</ns1:error_msg>
+        </ns1:update_acct_plan_status_mResponseElement>
+    </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

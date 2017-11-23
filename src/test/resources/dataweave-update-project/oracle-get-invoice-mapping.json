@@ -1,0 +1,103 @@
+{
+  "OutputParameters" : {
+    "@xmlns:xsi" : "http://www.w3.org/2001/XMLSchema-instance",
+    "@xmlns" : "http://xmlns.oracle.com/apps/pa/rest/xxsp_mapping_svc/get_invoice_mapping/",
+    "X_INV_MAP" : {
+      "X_INV_MAP_ITEM" : [ {
+        "CURRENCY_CODE" : "EUR",
+        "LEGAL_ENTITY" : "010",
+        "OPERATING_UNIT_ID" : "21",
+        "OPERATING_UNIT_NAME" : "US_OU-MERRILL CORPORATION",
+        "HEADER_LEFT" : "<null>",
+        "HEADER_RIGHT" : "<null>",
+        "FOOTER_LEFT" : "Remit Check Payment to:<br>Merrill Communications LLC<br>CM-9638<br>St. Paul, MN 55170-9638<br><br>PLEASE PAY FROM THIS INVOICE<br> (1.5% SERVICE CHARGE PER MONTH ADDED TO PAST DUE ACCOUNTS)<br",
+        "FOOTER_RIGHT" : "Remit ACH/Fed Wire Payment to:<br>Merrill Communications LLC<br>Account # : 1702-2502-6310<br>USBank, N.A.<br>601 Second Avenue South<br>Minneapolis, MN 55402<br>ABA Routing # : 091 000 022<br>SWIFT CODE USBKUS44IMT<br>Please reference Merrill invoice number on your payment.<br",
+        "TERMS_VERBIAGE" : "Terms: Due upon receipt"
+      }, {
+        "CURRENCY_CODE" : "EUR",
+        "LEGAL_ENTITY" : "071",
+        "OPERATING_UNIT_ID" : "23",
+        "OPERATING_UNIT_NAME" : "GB_OU-MERRILL CORPORATION LTD",
+        "HEADER_LEFT" : "MERRILL CORPORATION LTD",
+        "HEADER_RIGHT" : "Phone +44 (0) 207 562 3200  www.merrillcorp.com",
+        "FOOTER_LEFT" : "Wire payment to:<br>Merrill Corporation Limited<br>Bank of America<br>2 King Edward Street<br>London ECIA 1HQ<br>Account no: 54261038<br>IBAN:  GB84 BOFA 1650 5054 2610 38<br>Swift Code: BOFAGB22<br",
+        "FOOTER_RIGHT" : "Remit to/Registered Office:<br>Merrill Corporation Ltd<br>101 Finsbury Pavement<br>London EC2A 1ER<br>United Kingdom<br><br>Registered No: 3829230<br>VAT No. GB 743 8828 95<br",
+        "TERMS_VERBIAGE" : "Terms: Due Upon receipt, CPT client's facility Incoterms 2000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Please reference Merrill invoice number on your payment Electronically supplied services to EU clients are \"Subject to reverse charge by the Recipient\" EC directive 2006/112/EC"
+      }, {
+        "CURRENCY_CODE" : "EUR",
+        "LEGAL_ENTITY" : "073",
+        "OPERATING_UNIT_ID" : "24",
+        "OPERATING_UNIT_NAME" : "EU_OU-MERRILL CORPORATION EUR",
+        "HEADER_LEFT" : "MERRILL GERMANY GMBH",
+        "HEADER_RIGHT" : "An der Welle 8, D-60322 Frankfurt<br>Phone +49 (0) 69 244 321 450  www.merrillcorp.com",
+        "FOOTER_LEFT" : "Remit to:<br>Bank of America<br>Frankfurt Branch<br>Neue Mainzer Straße 52<br><br>IBAN:  GB10 BOFA 1650 5054 2610 12<br>Swift Code: BOFAGB22<br",
+        "FOOTER_RIGHT" : "Ust.-Ident.-Nr. DE 210107663<br>HRB 49989 Frankfurt am Main<br>Geschaftsführer: Alun Baker<br",
+        "TERMS_VERBIAGE" : "Terms: Due Upon receipt, CPT client's facility Incoterms 2000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Please reference Merrill invoice number on your payment Electronically supplied services to EU clients are \"Subject to reverse charge by the Recipient\" EC directive 2006/112/EC"
+      }, {
+        "CURRENCY_CODE" : "GBP",
+        "LEGAL_ENTITY" : "010",
+        "OPERATING_UNIT_ID" : "21",
+        "OPERATING_UNIT_NAME" : "US_OU-MERRILL CORPORATION",
+        "HEADER_LEFT" : "<null>",
+        "HEADER_RIGHT" : "<null>",
+        "FOOTER_LEFT" : "Remit Check Payment to:<br>Merrill Communications LLC<br>CM-9638<br>St. Paul, MN 55170-9638<br><br>PLEASE PAY FROM THIS INVOICE<br> (1.5% SERVICE CHARGE PER MONTH ADDED TO PAST DUE ACCOUNTS)<br",
+        "FOOTER_RIGHT" : "Remit ACH/Fed Wire Payment to:<br>Merrill Communications LLC<br>Account # : 1702-2502-6310<br>USBank, N.A.<br>601 Second Avenue South<br>Minneapolis, MN 55402<br>ABA Routing # : 091 000 022<br>SWIFT CODE USBKUS44IMT<br>Please reference Merrill invoice number on your payment.<br",
+        "TERMS_VERBIAGE" : "Terms: Due upon receipt"
+      }, {
+        "CURRENCY_CODE" : "GBP",
+        "LEGAL_ENTITY" : "071",
+        "OPERATING_UNIT_ID" : "23",
+        "OPERATING_UNIT_NAME" : "GB_OU-MERRILL CORPORATION LTD",
+        "HEADER_LEFT" : "MERRILL CORPORATION LTD",
+        "HEADER_RIGHT" : "Phone +44 (0) 207 562 3200  www.merrillcorp.com",
+        "FOOTER_LEFT" : "Wire payment to:<br>Merrill Corporation Limited<br>Bank of America<br>2 King Edward Street<br>London ECIA 1HQ<br>Sort Code: (BACS) 301635 (CHAPS) 165050<br>Account no: 54261012<br>IBAN:  GB10 BOFA 1650 5054 2610 12<br>Swift Code: BOFAGB22<br",
+        "FOOTER_RIGHT" : "Remit to/Registered Office:<br>Merrill Corporation Ltd<br>101 Finsbury Pavement<br>London EC2A 1ER<br>United Kingdom<br><br>Registered No: 3829230<br>VAT No. GB 743 8828 95<br",
+        "TERMS_VERBIAGE" : "Terms: Due Upon receipt, CPT client's facility Incoterms 2000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Please reference Merrill invoice number on your payment Electronically supplied services to EU clients are \"Subject to reverse charge by the Recipient\" EC directive 2006/112/EC"
+      }, {
+        "CURRENCY_CODE" : "GBP",
+        "LEGAL_ENTITY" : "073",
+        "OPERATING_UNIT_ID" : "24",
+        "OPERATING_UNIT_NAME" : "EU_OU-MERRILL CORPORATION EUR",
+        "HEADER_LEFT" : "MERRILL GERMANY GMBH",
+        "HEADER_RIGHT" : "An der Welle 8, D-60322 Frankfurt<br>Phone +49 (0) 69 244 321 450  www.merrillcorp.com",
+        "FOOTER_LEFT" : "Remit to:<br>Bank of America<br>Frankfurt Branch<br>Neue Mainzer Straße 52<br><br>IBAN:  GB10 BOFA 1650 5054 2610 12<br>Swift Code: BOFAGB22<br",
+        "FOOTER_RIGHT" : "Ust.-Ident.-Nr. DE 210107663<br>HRB 49989 Frankfurt am Main<br>Geschaftsführer: Alun Baker<br",
+        "TERMS_VERBIAGE" : "Terms: Due Upon receipt, CPT client's facility Incoterms 2000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Please reference Merrill invoice number on your payment Electronically supplied services to EU clients are \"Subject to reverse charge by the Recipient\" EC directive 2006/112/EC\n"
+      }, {
+        "CURRENCY_CODE" : "USD",
+        "LEGAL_ENTITY" : "010",
+        "OPERATING_UNIT_ID" : "21",
+        "OPERATING_UNIT_NAME" : "US_OU-MERRILL CORPORATION",
+        "HEADER_LEFT" : "<null>",
+        "HEADER_RIGHT" : "<null>",
+        "FOOTER_LEFT" : "Remit Check Payment to:<br>Merrill Communications LLC<br>CM-9638<br>St. Paul, MN 55170-9638<br><br>PLEASE PAY FROM THIS INVOICE<br> (1.5% SERVICE CHARGE PER MONTH ADDED TO PAST DUE ACCOUNTS)<br",
+        "FOOTER_RIGHT" : "Remit ACH/Fed Wire Payment to:<br>Merrill Communications LLC<br>Account # : 1702-2502-6310<br>USBank, N.A.<br>601 Second Avenue South<br>Minneapolis, MN 55402<br>ABA Routing # : 091 000 022<br>SWIFT CODE USBKUS44IMT<br>Please reference Merrill invoice number on your payment.<br",
+        "TERMS_VERBIAGE" : "Terms: Due upon receipt"
+      }, {
+        "CURRENCY_CODE" : "USD",
+        "LEGAL_ENTITY" : "071",
+        "OPERATING_UNIT_ID" : "23",
+        "OPERATING_UNIT_NAME" : "GB_OU-MERRILL CORPORATION LTD",
+        "HEADER_LEFT" : "MERRILL CORPORATION LTD",
+        "HEADER_RIGHT" : "Phone +44 (0) 207 562 3200  www.merrillcorp.com",
+        "FOOTER_LEFT" : "Wire payment to:<br>Merrill Corporation Limited<br>Bank of America<br>2 King Edward Street<br>London ECIA 1HQ<br>Account no: 54261020<br>IBAN:  GB85 BOFA 1650 5054 2610 20<br>Swift Code: BOFAGB22<br",
+        "FOOTER_RIGHT" : "Remit to/Registered Office:<br>Merrill Corporation Ltd<br>101 Finsbury Pavement<br>London EC2A 1ER<br>United Kingdom<br><br>Registered No: 3829230<br>VAT No. GB 743 8828 95<br",
+        "TERMS_VERBIAGE" : "Terms: Due Upon receipt, CPT client's facility Incoterms 2000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Please reference Merrill invoice number on your payment Electronically supplied services to EU clients are \"Subject to reverse charge by the Recipient\" EC directive 2006/112/EC"
+      }, {
+        "CURRENCY_CODE" : "USD",
+        "LEGAL_ENTITY" : "073",
+        "OPERATING_UNIT_ID" : "24",
+        "OPERATING_UNIT_NAME" : "EU_OU-MERRILL CORPORATION EUR",
+        "HEADER_LEFT" : "MERRILL GERMANY GMBH",
+        "HEADER_RIGHT" : "An der Welle 8, D-60322 Frankfurt<br>Phone +49 (0) 69 244 321 450  www.merrillcorp.com",
+        "FOOTER_LEFT" : "Remit to:<br>Bank of America<br>Frankfurt Branch<br>Neue Mainzer Straße 52<br><br>IBAN:  GB10 BOFA 1650 5054 2610 12<br>Swift Code: BOFAGB22<br",
+        "FOOTER_RIGHT" : "Ust.-Ident.-Nr. DE 210107663<br>HRB 49989 Frankfurt am Main<br>Geschaftsführer: Alun Baker<br",
+        "TERMS_VERBIAGE" : "Terms: Due Upon receipt, CPT client's facility Incoterms 2000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Please reference Merrill invoice number on your payment Electronically supplied services to EU clients are \"Subject to reverse charge by the Recipient\" EC directive 2006/112/EC\n"
+      } ]
+    },
+    "X_RESULTS" : {
+      "STATUS" : "S",
+      "MESSAGE" : "9 Rows Returned."
+    }
+  }
+}

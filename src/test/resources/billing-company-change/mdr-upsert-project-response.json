@@ -1,0 +1,57 @@
+[
+  {
+    "EntityTypeKey": "PROJ",
+
+    "IdentifierTypeKey": "SF_Proj",
+    "IdentifierValue": "a27c0000005RNipAAG"
+  },
+  {
+    "EntityTypeKey": "PROJ",
+
+    "IdentifierTypeKey": "SF_BILLADDR",
+    "IdentifierValue": "a3hc0000000FBy4AAG",
+
+    "Qualifier1Key": "OPERUNIT",
+    "Qualifier1Value": "US_OU-MERRILL CORPORATION"
+  },
+  {
+    "EntityTypeKey": "PROJ",
+
+    "IdentifierTypeKey": "SF_BILLCO",
+    "IdentifierValue": "a2dS0000000QsSQIA0",
+
+    "Qualifier1Key": "VAT",
+    "Qualifier2Value": null
+  },
+
+  {
+    "EntityTypeKey": "PROJ",
+
+    "IdentifierTypeKey": "Aria_Acct",
+    "IdentifierValue": "1704915",
+
+    "Qualifier1Key": "CURRENCY",
+    "Qualifier1Value": "USD",
+
+    "Qualifier2Key": "LEGALENT",
+    "Qualifier2Value": "010 - MERRILL COMMUNICATIONS LLC"
+  },
+  {
+    "EntityTypeKey": "PROJ",
+
+    "IdentifierTypeKey": "Aria_MPI",
+    "IdentifierValue": "2301644",
+
+    "Qualifier1Key": "ARIAACCT",
+    "Qualifier1Value": "1704915"
+  },
+    {
+    "EntityTypeKey": "PROJ",
+
+    "IdentifierTypeKey": "ORA_Site",
+    "IdentifierValue": "32123",
+
+    "Qualifier1Key": "ARIAACCT",
+    "Qualifier1Value": "1704915"
+  }
+]

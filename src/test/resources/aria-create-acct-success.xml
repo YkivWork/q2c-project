@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns1="urn:client:api:wsdl:document/literal_wrapped:vers:11.0:aria_complete_m_api" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <SOAP-ENV:Body>
+    <ns1:create_acct_complete_mResponseElement>
+      <ns1:error_code>0</ns1:error_code>
+      <ns1:error_msg>OK</ns1:error_msg>
+      <ns1:out_acct>
+        <ns1:acct_no>1167854</ns1:acct_no>
+        <ns1:userid>3493699</ns1:userid>
+        <ns1:client_acct_id xsi:nil="true"/>
+        <ns1:acct_locale_no>10001</ns1:acct_locale_no>
+        <ns1:acct_locale_name>System_US_English_locale</ns1:acct_locale_name>
+        <ns1:acct_contact_no>3076944</ns1:acct_contact_no>
+        <ns1:billing_contact_details xsi:nil="true"/>
+        <ns1:statement_contact_details>
+          <ns1:billing_group_no>691663</ns1:billing_group_no>
+          <ns1:stmt_contact_no xsi:nil="true"/>
+        </ns1:statement_contact_details>
+        <ns1:other_contact_details xsi:nil="true"/>
+        <ns1:contract_details xsi:nil="true"/>
+        <ns1:session_id xsi:nil="true"/>
+        <ns1:billing_errors xsi:nil="true"/>
+        <ns1:master_plans_assigned>
+          <ns1:plan_instance_no>1428393</ns1:plan_instance_no>
+          <ns1:client_plan_instance_id>1428393</ns1:client_plan_instance_id>
+          <ns1:nso_order_no xsi:nil="true"/>
+          <ns1:nso_order_status_label xsi:nil="true"/>
+          <ns1:plan_unit_instance_details xsi:nil="true"/>
+          <ns1:supp_plans_assigned>
+            <ns1:supp_plan_instance_no>1428394</ns1:supp_plan_instance_no>
+            <ns1:client_plan_instance_id>1428394</ns1:client_plan_instance_id>
+            <ns1:plan_unit_instance_details xsi:nil="true"/>
+          </ns1:supp_plans_assigned>
+          <ns1:supp_plans_assigned>
+            <ns1:supp_plan_instance_no>1428395</ns1:supp_plan_instance_no>
+            <ns1:client_plan_instance_id>1428395</ns1:client_plan_instance_id>
+            <ns1:plan_unit_instance_details xsi:nil="true"/>
+          </ns1:supp_plans_assigned>
+          <ns1:supp_plans_assigned>
+            <ns1:supp_plan_instance_no>1428396</ns1:supp_plan_instance_no>
+            <ns1:client_plan_instance_id>1428396</ns1:client_plan_instance_id>
+            <ns1:plan_unit_instance_details xsi:nil="true"/>
+          </ns1:supp_plans_assigned>
+          <ns1:supp_plans_assigned>
+            <ns1:supp_plan_instance_no>1428397</ns1:supp_plan_instance_no>
+            <ns1:client_plan_instance_id>1428397</ns1:client_plan_instance_id>
+            <ns1:plan_unit_instance_details xsi:nil="true"/>
+          </ns1:supp_plans_assigned>
+          <ns1:supp_plans_assigned>
+            <ns1:supp_plan_instance_no>1428398</ns1:supp_plan_instance_no>
+            <ns1:client_plan_instance_id>1428398</ns1:client_plan_instance_id>
+            <ns1:plan_unit_instance_details xsi:nil="true"/>
+          </ns1:supp_plans_assigned>
+          <ns1:supp_plans_assigned>
+            <ns1:supp_plan_instance_no>1428399</ns1:supp_plan_instance_no>
+            <ns1:client_plan_instance_id>1428399</ns1:client_plan_instance_id>
+            <ns1:plan_unit_instance_details xsi:nil="true"/>
+          </ns1:supp_plans_assigned>
+          <ns1:supp_plans_assigned>
+            <ns1:supp_plan_instance_no>1428400</ns1:supp_plan_instance_no>
+            <ns1:client_plan_instance_id>1428400</ns1:client_plan_instance_id>
+            <ns1:plan_unit_instance_details xsi:nil="true"/>
+          </ns1:supp_plans_assigned>
+          <ns1:supp_plans_assigned>
+            <ns1:supp_plan_instance_no>1428401</ns1:supp_plan_instance_no>
+            <ns1:client_plan_instance_id>1428401</ns1:client_plan_instance_id>
+            <ns1:plan_unit_instance_details xsi:nil="true"/>
+          </ns1:supp_plans_assigned>
+        </ns1:master_plans_assigned>
+        <ns1:invoice_info xsi:nil="true"/>
+      </ns1:out_acct>
+    </ns1:create_acct_complete_mResponseElement>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

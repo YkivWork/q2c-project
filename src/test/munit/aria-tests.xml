@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:core="http://www.mulesoft.org/schema/mule/core" xmlns:mock="http://www.mulesoft.org/schema/mule/mock" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/mock http://www.mulesoft.org/schema/mule/mock/current/mule-mock.xsd">
+    <munit:config name="munit" doc:name="MUnit configuration"/>
+    <spring:beans>
+        <spring:import resource="classpath:aria.xml"/>
+        <spring:import resource="classpath:aria-lookups.xml"/>
+        <spring:import resource="classpath:oracle-lookups.xml"/>
+        <spring:import resource="classpath:sfdc-lookups.xml"/>
+        <spring:import resource="classpath:mdr-xrefs.xml"/>
+        <spring:import resource="classpath:mdr-upserts.xml"/>
+        <spring:import resource="classpath:oracle-auth.xml"/>
+        <spring:import resource="classpath:globals.xml"/>
+    </spring:beans>
+
+
+    <munit:test name="createInAriaFlowHandlesCallsCorrectly" description="MUnit Test">
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock Oracle Auth">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('getOracleAuthFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="{ }" mimeType="application/json">
+                <mock:invocation-properties>
+                    <mock:invocation-property key="oracleAuth" value="#[ ['tokenName': '', 'accessToken': ''] ]" mimeType="application/java"/>
+                </mock:invocation-properties>
+            </mock:then-return>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock Aria Create">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${aria.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('aria-create-acct-success.xml').asString()]" mimeType="application/xml"/>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock Aria Lookup">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${aria.admintools.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('aria-entitlements-response.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock Invoice Mapping">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${oracle.invoiceMapping.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('oracle-get-invoice-mapping.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="InvoiceTemplateMapping Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${oracle.invoiceTemplateMapping.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('oracle-get-invoice-template-mapping.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('lookupSalesRepFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[ [ ['name': 'John Doe', 'isPrimary': false, 'employeeNumber': 'abc123', 'splitPercentage': '20.0'], ['name': 'Jane Doe', 'isPrimary': true, 'employeeNumber': 'qwer567', 'splitPercentage': '80.0'] ] ]"/>
+        </mock:when>
+
+        <set-payload value="#[getResource('sfdc-query-response.json').asString()]" doc:name="Variable" />
+        <json:json-to-object-transformer returnClass="java.util.HashMap" doc:name="JSON to Object"/>
+        <set-variable value="#[payload]" variableName="theProject" doc:name="Variable" />
+                
+        <munit:set payload="#[]" doc:name="Set Message"/>
+        <flow-ref name="createInAriaFlow" doc:name="createInAriaFlow"/>
+
+        <!-- TODO Need to add in either asserts after the flow-ref, verify's, or asserts within a spy -->
+    </munit:test>
+
+    <munit:test name="createInAriaFlowFormatsRequestProperlyForAria" description="Test">
+        <mock:when messageProcessor="http:request" doc:name="Mock Aria Create Account Successful Response">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${aria.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('aria-create-acct-success.xml').asString()]" mimeType="application/xml"/>
+
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock Aria Entitlement Response">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${aria.admintools.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('aria-entitlements-response.json').asString()]" mimeType="application/json"/>
+
+        </mock:when>
+        <mock:when messageProcessor="mule:flow" doc:name="Mock Lookup Invoice Mapping">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="lookupFromInvoiceMappingFlow"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[ [:] ]"/>
+
+        </mock:when>
+        <mock:when messageProcessor="sfdc:query" doc:name="Mock Salesforce Call">
+            <mock:with-attributes>
+                <mock:with-attribute name="query" whereValue="#[matchContains('FROM OpportunitySplit')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[ [ ['Id': 'abc123', 'Is_Primary__c': true, 'SplitPercentage': 100.0, 'SplitOwnerId': 'qwer']] ]" mimeType="application/java"/>
+        </mock:when>
+        <mock:when messageProcessor="sfdc:query" doc:name="Mock Salesforce Call">
+            <mock:with-attributes>
+                <mock:with-attribute name="query" whereValue="#[matchContains('FROM User')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[ [ ['EmployeeNumber': '123', 'Id': 'abc123', 'Name': 'Testing' ]] ]" mimeType="application/java"/>
+        </mock:when>
+
+        <mock:when messageProcessor="http:request" doc:name="InvoiceTemplateMapping Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${oracle.invoiceTemplateMapping.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('oracle-get-invoice-template-mapping.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock Oracle Auth">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('getOracleAuthFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="{ }" mimeType="application/json">
+                <mock:invocation-properties>
+                    <mock:invocation-property key="oracleAuth" value="#[ ['tokenName': '', 'accessToken': ''] ]" mimeType="application/java"/>
+                </mock:invocation-properties>
+            </mock:then-return>
+        </mock:when>
+        <mock:spy messageProcessor="http:request" doc:name="Spy">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${aria.path}"/>
+            </mock:with-attributes>
+            <mock:assertions-before-call>
+                <set-variable variableName="acctRowNode" value="#[xpath3('/soap:Envelope/soap:Body/aria:create_acct_complete_m/acct/acct_row', payload, 'NODE')]" doc:name="Variable"/>
+                <munit:assert-true message="acctRowNode should not be null" condition="#[flowVars.acctRowNode != empty]" doc:name="Assert True"/>
+                <munit:assert-on-equals message="billing_group_name is invalid" expectedValue="27700.0-32123.0-USD" actualValue="#[xpath3('billing_group/billing_group_row/billing_group_name', flowVars.acctRowNode)]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="statement_template is invalid" expectedValue="112" actualValue="#[xpath3('billing_group/billing_group_row/statement_template', flowVars.acctRowNode)]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="stmt_contact_idx is invalid" expectedValue="1" actualValue="#[xpath3('billing_group/billing_group_row/stmt_contact_idx', flowVars.acctRowNode)]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="client_legal_entity_id is invalid" expectedValue="010" actualValue="#[xpath3('client_legal_entity_id', flowVars.acctRowNode)]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="retroactive_start_date is invalid" expectedValue="2017-02-11" actualValue="#[xpath3('retroactive_start_date', flowVars.acctRowNode)]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="invoicing_option is invalid" expectedValue="4" actualValue="#[xpath3('invoicing_option', flowVars.acctRowNode)]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="status_cd is invalid" expectedValue="#[]" actualValue="#[xpath3('status_cd', flowVars.acctRowNode, 'NODE')]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="alt_start_date is invalid" expectedValue="#[]" actualValue="#[xpath3('alt_start_date', flowVars.acctRowNode, 'NODE')]" doc:name="Assert Equals"/>
+                <set-variable variableName="planInstanceFieldsNode" value="#[xpath3('master_plans_detail/master_plans_detail_row/plan_instance_fields_info', flowVars.acctRowNode, 'NODE')]" doc:name="Variable"/>
+                <munit:assert-on-equals message="ADMIN_DESTINATION should not be in output when value is blank" expectedValue="#[]" actualValue="#[xpath3('plan_instance_fields_info_row[field_name = &quot;ADMIN_DESTINATION&quot;]', flowVars.planInstanceFieldsNode, 'NODE')]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="BILL_TO_ADDRESS_IDS is invalid" expectedValue="32123.0" actualValue="#[xpath3('plan_instance_fields_info_row[field_name = &quot;BILL_TO_ADDRESS_IDS&quot;]/field_value', flowVars.planInstanceFieldsNode)]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="CONTRACT_CUSTOMER is invalid" expectedValue="3M" actualValue="#[xpath3('plan_instance_fields_info_row[field_name = &quot;CONTRACT_CUSTOMER&quot;]/field_value', flowVars.planInstanceFieldsNode)]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="CONTRACT_CUSTOMER_ADDRESS is invalid" expectedValue="1 Main St City MN 55555" actualValue="#[xpath3('plan_instance_fields_info_row[field_name = &quot;CONTRACT_CUSTOMER_ADDRESS&quot;]/field_value', flowVars.planInstanceFieldsNode)]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="CONTRACT_CUSTOMER_CONTACT is invalid" expectedValue="John Doe" actualValue="#[xpath3('plan_instance_fields_info_row[field_name = &quot;CONTRACT_CUSTOMER_CONTACT&quot;]/field_value', flowVars.planInstanceFieldsNode)]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="CONTRACT_TERM is invalid" expectedValue="5" actualValue="#[xpath3('plan_instance_fields_info_row[field_name = &quot;CONTRACT_TERM&quot;]/field_value', flowVars.planInstanceFieldsNode)]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="CURRENT_ENTITLEMENT is invalid" expectedValue="VDR; SecureExcelViewer; QA" actualValue="#[xpath3('plan_instance_fields_info_row[field_name = &quot;CURRENT_ENTITLEMENT&quot;]/field_value', flowVars.planInstanceFieldsNode)]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="PRODUCT_TYPE is invalid" expectedValue="Datasite-Asset Sale" actualValue="#[xpath3('plan_instance_fields_info_row[field_name = &quot;PRODUCT_TYPE&quot;]/field_value', flowVars.planInstanceFieldsNode)]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="PROJECT_CREATION_DATE is invalid" expectedValue="2017-03-06" actualValue="#[xpath3('plan_instance_fields_info_row[field_name = &quot;PROJECT_CREATION_DATE&quot;]/field_value', flowVars.planInstanceFieldsNode)]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="REVENUE_SITE is invalid" expectedValue="STP" actualValue="#[xpath3('plan_instance_fields_info_row[field_name = &quot;REVENUE_SITE&quot;]/field_value', flowVars.planInstanceFieldsNode)]" doc:name="Assert Equals"/>
+                <set-variable variableName="suppFieldsNode" value="#[xpath3('supp_field', flowVars.acctRowNode, 'NODE')]" doc:name="Variable"/>
+                <munit:assert-on-equals message="SFDC_ID is invalid" expectedValue="a2dS0000000QsSERX0" actualValue="#[xpath3('supp_field_row[supp_field_name = &quot;SFDC_ID&quot;]/supp_field_value', flowVars.suppFieldsNode)]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="VAT_REGISTRATION_NO is invalid" expectedValue="VAT-Testing" actualValue="#[xpath3('supp_field_row[supp_field_name = &quot;VAT_REGISTRATION_NO&quot;]/supp_field_value', flowVars.suppFieldsNode)]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="PAN_TAX_NO is invalid" expectedValue="#[]" actualValue="#[xpath3('supp_field_row[supp_field_name = &quot;PAN_TAX_NO&quot;]/supp_field_value', flowVars.suppFieldsNode, 'NODE')]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="ORACLE_ID is invalid" expectedValue="32123.0" actualValue="#[xpath3('supp_field_row[supp_field_name = &quot;ORACLE_ID&quot;]/supp_field_value', flowVars.suppFieldsNode)]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="LEGAL_ENTITY_NAME is invalid" expectedValue="MERRILL COMMUNICATIONS LLC" actualValue="#[xpath3('supp_field_row[supp_field_name = &quot;LEGAL_ENTITY_NAME&quot;]/supp_field_value', flowVars.suppFieldsNode)]" doc:name="Assert Equals"/>
+            </mock:assertions-before-call>
+        </mock:spy>
+
+        
+        <set-payload value="#[getResource('sfdc-query-response.json').asString()]" mimeType="application/json" doc:name="Variable" />
+        <json:json-to-object-transformer returnClass="java.util.HashMap" mimeType="application/java" doc:name="JSON to Object"/>
+        <set-variable value="#[payload]" variableName="theProject" mimeType="application/java" doc:name="Variable" />
+        <set-variable value="#[payload['companies'][0]]" variableName="theCompany" mimeType="application/java" doc:name="Variable" />
+        
+        <flow-ref name="createInAriaFlow" doc:name="createInAriaFlow"/>
+    </munit:test>
+
+    <munit:test name="getAriaEntitlementsFlowMatchesUpTheMPICorrectly" description="MUnit Test">
+        <set-variable variableName="ariaAcctDetails" value="#[getResource('aria-current-entitlements/aria-get-acct-details-having-many.xml').asString()]" mimeType="application/java"/>
+
+        <set-variable variableName="ariaValues" value="#[dw('ariaMPI: &quot;some-aria-mpi&quot;', 'application/java')]"/>
+
+        <set-payload value="#[getResource('sfdc-query-response.json').asString()]" mimeType="application/json" doc:name="Variable" />
+        <set-variable variableName="theProject" value="#[dw(payload, 'application/json')]" mimeType="application/java" doc:name="Variable" />
+        <set-variable variableName="upsertSfdcProjResponse" value="#[getResource('aria-current-entitlements/mdr-getcrossreference-response.json').asString()]" mimeType="application/json" doc:name="Variable"/>
+
+        <flow-ref name="parseAriaCurrentEntitlementAndStateForMPIFlow" doc:name="parseAriaCurrentEntitlementAndStateForMPIFlow"/>
+        
+        <munit:assert-on-equals message="entitlements is invalid" expectedValue="Prep_E" actualValue="#[payload.entitlements]" doc:name="Assert Equals"/>
+    </munit:test>
+
+    <munit:test name="addPlanToAccountParsesTheResponse" description="Test">
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('getAriaAcctDetailsFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[NullPayload.getInstance()]"/>
+        </mock:when>
+
+        <mock:when messageProcessor="http:request" doc:name="Mock Aria Entitlement Response">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${aria.admintools.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('aria-entitlements-response.json').asString()]" mimeType="application/json"/>
+
+
+        </mock:when>
+        <mock:when messageProcessor="mule:flow" doc:name="Mock Lookup Invoice Mapping">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="lookupFromInvoiceMappingFlow"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[ [:] ]"/>
+
+
+        </mock:when>
+        <mock:when messageProcessor="sfdc:query" doc:name="Mock Salesforce Call">
+            <mock:with-attributes>
+                <mock:with-attribute name="query" whereValue="#[matchContains('FROM OpportunitySplit')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[ [ ['Id': 'abc123', 'Is_Primary__c': true, 'SplitPercentage': 100.0, 'SplitOwnerId': 'qwer']] ]" mimeType="application/java"/>
+
+        </mock:when>
+        <mock:when messageProcessor="sfdc:query" doc:name="Mock Salesforce Call">
+            <mock:with-attributes>
+                <mock:with-attribute name="query" whereValue="#[matchContains('FROM User')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[ [ ['EmployeeNumber': '123', 'Id': 'abc123', 'Name': 'Testing' ]] ]" mimeType="application/java"/>
+        </mock:when>
+
+        <mock:when messageProcessor="http:request" doc:name="InvoiceTemplateMapping Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${oracle.invoiceTemplateMapping.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('oracle-get-invoice-template-mapping.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock Oracle Auth">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('getOracleAuthFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="{ }" mimeType="application/json">
+                <mock:invocation-properties>
+                    <mock:invocation-property key="oracleAuth" value="#[ ['tokenName': '', 'accessToken': ''] ]" mimeType="application/java"/>
+                </mock:invocation-properties>
+            </mock:then-return>
+        </mock:when>
+
+        <mock:when messageProcessor="http:request" doc:name="Mock Aria Add Plan to Account Successful Response">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${aria.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('aria-add-plan-to-account-response.xml').asString()]" mimeType="application/xml"/>
+        </mock:when>
+
+        <set-variable variableName="ariaValues" value="#[ ['ariaAcct': '1234', 'ariaMPI': null] ]" mimeType="application/java" doc:name="Variable"/>
+
+        <set-payload value="#[getResource('sfdc-query-response.json').asString()]" mimeType="application/json" doc:name="Variable" />
+        <json:json-to-object-transformer returnClass="java.util.HashMap" mimeType="application/java" doc:name="JSON to Object"/>
+        <set-variable value="#[payload]" variableName="theProject" mimeType="application/java" doc:name="Variable" />
+        <set-variable value="#[payload['companies'][0]]" variableName="theCompany" mimeType="application/java" doc:name="Variable" />
+
+        <flow-ref name="createNewPlanInAriaFlow" doc:name="createNewPlanInAriaFlow"/>
+
+        <munit:assert-on-equals message="planInstanceNumber is invalid" expectedValue="2462549" actualValue="#[payload.planInstanceNumber]" doc:name="Assert Equals"/>
+    </munit:test>
+</mule>

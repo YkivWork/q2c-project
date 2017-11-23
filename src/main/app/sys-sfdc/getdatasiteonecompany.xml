@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd">
+    <flow name="GET_DATASITEONE_COMPANY" processingStrategy="synchronous">
+        <vm:inbound-endpoint exchange-pattern="request-response" path="VM_GET_DATASITEONE_COMPANY" connector-ref="VM_IN_MEMORY" doc:name="getDataSiteOneCompany"/>
+        <logger message="Project Id: #[message.payloadAs(java.lang.String)]" level="INFO" category="GET_DATASITEONE_COMPANY" doc:name="[DEBUG]Log Initial Payload"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload ]]></dw:set-payload>
+        </dw:transform-message>
+        <set-variable variableName="projectId" value="#[payload.projectId]" doc:name="Flow Var Project Id"/>
+
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Billing_Address__c, Customer_Order_Number__c, Email_Address__c, First_Name__c, Last_Name__c, Billing_Company__c, Id, Name, Phone__c, Retro_Change__c, Billing_Split__c FROM DatasiteOne_Company__c WHERE DatasiteOne_Project__c = '#[flowVars.projectId]' AND Billing_Split__c &gt; 0" doc:name="Salesforce"/>
+        <json:object-to-json-transformer mimeType="application/json" doc:name="Object to JSON"/>
+        <logger message="system=SFDC action=results method=GetDatasiteOneCompany projectId=#[flowVars.projectId] payload=#[message.payloadAs(java.lang.String)]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger level="ERROR" doc:name="Log Exception Summary" category="getDataSiteOneCompany" message="Exception Summary: #[exception.getSummaryMessage()]"/>
+            <set-payload doc:name="Set Payload" value="Unable to get DS1 Company by Project Id: #[flowVars.projectId]"/>
+            <set-property doc:name="400" propertyName="http.status" value="#[400]"/>
+        </catch-exception-strategy>
+    </flow>
+</mule>

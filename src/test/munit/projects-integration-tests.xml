@@ -1,0 +1,355 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+xmlns:spring="http://www.springframework.org/schema/beans"
+xmlns:json="http://www.mulesoft.org/schema/mule/json"
+xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+xmlns:core="http://www.mulesoft.org/schema/mule/core"
+xmlns:mock="http://www.mulesoft.org/schema/mule/mock"
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:schemaLocation="http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/mock http://www.mulesoft.org/schema/mule/mock/current/mule-mock.xsd
+">
+    <munit:config name="munit" doc:name="MUnit configuration"/>
+    <spring:beans>
+        <spring:import resource="classpath:projects.xml"/>
+        <spring:import resource="classpath:aria.xml"/>
+        <spring:import resource="classpath:dso.xml"/>
+        <spring:import resource="classpath:dso-auth.xml"/>
+        <spring:import resource="classpath:sfdc.xml"/>
+        <spring:import resource="classpath:sfdc-lookups.xml"/>
+        <spring:import resource="classpath:error-handling.xml"/>
+        <spring:import resource="classpath:oracle.xml"/>
+        <spring:import resource="classpath:oracle-auth.xml"/>
+        <spring:import resource="classpath:oracle-lookups.xml"/>
+        <spring:import resource="classpath:mdr-xrefs.xml"/>
+        <spring:import resource="classpath:mdr-upserts.xml"/>
+        <spring:import resource="classpath:globals.xml"/>
+    </spring:beans>
+
+    <munit:test name="findToAriaValues_LocatesCorrectValuesToActivate" description="Test">
+
+        <set-payload value="#[getResource('project-tests/inactive-dso-company/second-mdr-upsert-proj.json').asString()]" mimeType="application/json"/>
+        <set-payload value="#[dw(payload, 'application/java')]" doc:name="Set Payload"/>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock upsertPROJ:SF_PROJ">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('upsertPROJ:SF_PROJ')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[payload]"/>
+        </mock:when>
+
+        <set-payload value="#[getResource('project-tests/inactive-dso-company/mdr-org-billco-response.json').asString()]" mimeType="application/json"/>
+        <set-payload value="#[dw(payload, 'application/java')]" doc:name="Set Payload"/>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock upsertORG:SF_BILLCO">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('upsertORG:SF_BILLCO')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[payload]"/>
+        </mock:when>
+
+        <set-payload value="#[getResource('sfdc-query-response.json').asString()]" mimeType="application/json"/>
+        <set-payload value="#[dw(payload, 'application/java')]" doc:name="Set Payload"/>
+        <set-variable variableName="theProject" value="#[payload]" doc:name="Variable"/>
+
+        <munit:set payload="#[]" doc:name="Set Message"/>
+
+        <flow-ref name="findToAriaValues" doc:name="findToAriaValues"/>
+
+        <munit:assert-on-equals message="ariaAcct is invalid" expectedValue="1818786" actualValue="#[payload['ariaAcct']]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="ariaMPI is invalid" expectedValue="2148350" actualValue="#[payload['ariaMPI']]" doc:name="Assert Equals"/>
+    </munit:test>
+
+    <munit:test name="findFromAriaValues_LocatesCorrectValuesToDeactivate" description="Test">
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('deactivateBillingCompanyFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[NullPayload.getInstance()]"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('findToAriaValues')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[NullPayload.getInstance()]"/>
+        </mock:when>
+        <mock:spy messageProcessor="mule:sub-flow" doc:name="Spy">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('deactivateBillingCompanyFlow')]"/>
+            </mock:with-attributes>
+            <mock:assertions-before-call>
+                <munit:assert-on-equals message="FromAcctNo" expectedValue="1608118" actualValue="#[flowVars.fromAriaValues.ariaAcct]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="FromMPI" expectedValue="2148350" actualValue="#[flowVars.fromAriaValues.ariaMPI]" doc:name="Assert Equals"/>
+            </mock:assertions-before-call>
+        </mock:spy>
+
+        <set-payload value="#[getResource('project-tests/inactive-dso-company/deactivate-mdr-org-billco-response.json').asString()]" mimeType="application/json"/>
+        <set-payload value="#[dw(payload, 'application/java')]" doc:name="Set Payload"/>
+        <set-variable variableName="upsertOrgResponse" value="#[payload]"/>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock upsertORG:SF_BILLCO">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('upsertORG:SF_BILLCO')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[payload]"/>
+        </mock:when>
+
+        <!--
+        From
+        Aria_MPI 2148350
+        ARIAACCT 1608118
+
+        To
+        Aria_MPI 2148350
+        ARIAACCT 1818786
+        -->
+        <set-payload value="#[getResource('sfdc-query-response.json').asString()]" mimeType="application/json"/>
+        <set-payload value="#[dw(payload, 'application/java')]" doc:name="Set Payload"/>
+        <set-variable variableName="theProject" value="#[payload]" doc:name="Variable"/>
+
+        <set-payload value="#[getResource('project-tests/inactive-dso-company/mdr-upsert-proj.json').asString()]" mimeType="application/json"/>
+        <set-payload value="#[dw(payload, 'application/java')]" doc:name="Set Payload"/>
+        <set-variable variableName="initialUpsertSfdcProjResponse" value="#[payload]" doc:name="Variable"/>
+        <set-variable variableName="upsertSfdcProjResponse" value="#[payload]" doc:name="Variable"/>
+
+        <set-variable variableName="theCompany" value="#[dw('billingCompany:{sfdcId:flowVars.sfBillCoInactivate.sfdcId, vatRegistration:flowVars.sfBillCoInactivate.vat}')]" doc:name="Variable"/>
+
+        <munit:set payload="#[]" doc:name="Set Message"/>
+
+        <flow-ref name="reconcileBillingCompany" doc:name="reconcileBillingCompany"/>
+
+    </munit:test>
+
+    <munit:test name="deactivateBillingCompanyFlow_LocatesCorrectValues" description="Test">
+        <set-variable variableName="sfBillCoInactivate" value="#[ ['sfdcId': 'XXXXXXXXXXXXXXXXXX', 'vat': 'VAT-Testing'] ]"/>
+        <set-variable variableName="fromAriaValues" value="#[ ['ariaAcct': '1234', 'ariaMpi': '9876'] ]"/>
+
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('addBillCoToSfProjXRefFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[NullPayload.getInstance()]"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('addBillAddrToSfProjXRefFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[NullPayload.getInstance()]"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('addOraAcctToSfProjXRefFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[NullPayload.getInstance()]"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('addOraSiteToSfProjXRefFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[NullPayload.getInstance()]"/>
+        </mock:when>
+
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('ariaDeactivateWorkflow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[NullPayload.getInstance()]"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('addAriaAcctToSfProjXRefFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[NullPayload.getInstance()]"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('addAriaMpiToSfProjectFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[NullPayload.getInstance()]"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('addAriaAcctToSfBillCoXRefFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[NullPayload.getInstance()]"/>
+        </mock:when>
+
+        <mock:when messageProcessor="mule:flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="ariaDeactivateWorkflow"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[NullPayload.getInstance()]"/>
+        </mock:when>
+
+        <set-variable variableName="moveToCompany" value="#[ ['retroChange': true] ]"/>
+
+        <set-payload value="#[getResource('project-tests/inactive-dso-company/mdr-upsert-proj.json').asString()]" mimeType="application/json"/>
+        <set-payload value="#[dw(payload, 'application/java')]" doc:name="Set Payload"/>
+        <set-variable variableName="initialUpsertSfdcProjResponse" value="#[payload]" doc:name="Variable"/>
+        <set-variable variableName="upsertSfdcProjResponse" value="#[payload]" doc:name="Variable"/>
+
+        <set-variable variableName="sfBillCoInactivate" value="#[dw(&quot;{sfdcId: 'a3ic0000000jnwuAAA', vat: 'VAT-Testing'}&quot;, 'application/java')]" doc:name="Variable"/>
+
+        <set-variable variableName="fromAriaValues" value="#[ ['ariaAcct': '1234','ariaMPI': '9876'] ]"/>
+
+        <flow-ref name="deactivateBillingCompanyFlow"/>
+
+        <munit:assert-on-equals message="Aria MPI is invalid" expectedValue="9876" actualValue="#[flowVars.ariaResponse.planInstanceNumber]"/>
+    </munit:test>
+
+    <munit:test name="reconcileBillingAddressCallsWorkflowWhenDifferencesAreFoundAndRetroChangeIsTrue" description="Test">
+        <mock:when messageProcessor="mule:flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="ariaDeactivateWorkflow"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[NullPayload.getInstance()]"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('addBillAddrToSfProjXRefFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[NullPayload.getInstance()]"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('addOraSiteToSfProjXRefFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[NullPayload.getInstance()]"/>
+        </mock:when>
+
+        <set-variable variableName="ariaValues" value="#[ ['ariaAcct': '1234', 'ariaMPI': 'zxcv'] ]" mimeType="application/java" doc:name="Variable"/>
+
+        <set-payload value="#[getResource('project-tests/inactive-billing-address/mdr-upsert-proj.json').asString()]" mimeType="application/json"/>
+        <set-payload value="#[dw(payload, 'application/java')]" doc:name="Set Payload"/>
+        <set-variable variableName="initialUpsertSfdcProjResponse" value="#[payload]" doc:name="Variable"/>
+
+        <set-payload value="#[getResource('sfdc-query-response.json').asString()]" mimeType="application/json"/>
+        <set-payload value="#[dw(payload, 'application/java')]" doc:name="Set Payload"/>
+        <set-variable variableName="theProject" value="#[payload]" doc:name="Variable"/>
+        <set-variable variableName="theCompany" value="#[payload.companies[0]]" doc:name="Variable"/>
+
+        <set-payload value="#[]" mimeType="application/java"/>
+
+        <flow-ref name="reconcileBillingAddress"/>
+
+        <mock:verify-call messageProcessor="mule:sub-flow" times="1" doc:name="Verify Call">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('addBillAddrToSfProjXRefFlow')]"/>
+            </mock:with-attributes>
+        </mock:verify-call>
+        <mock:verify-call messageProcessor="mule:sub-flow" times="1" doc:name="Verify Call">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('addOraSiteToSfProjXRefFlow')]"/>
+            </mock:with-attributes>
+        </mock:verify-call>
+        <mock:verify-call messageProcessor="mule:flow" times="1" doc:name="Verify Call">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="ariaDeactivateWorkflow"/>
+            </mock:with-attributes>
+        </mock:verify-call>
+    </munit:test>
+
+    <munit:test name="reconcileBillingAddressDoesNotCallWorkflowWhenDifferencesAreFoundAndRetroChangeIsFalse" description="Test">
+        <mock:when messageProcessor="mule:flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="ariaDeactivateWorkflow"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[NullPayload.getInstance()]"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('addBillAddrToSfProjXRefFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[NullPayload.getInstance()]"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('addOraSiteToSfProjXRefFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[NullPayload.getInstance()]"/>
+        </mock:when>
+
+        <set-variable variableName="ariaValues" value="#[ ['ariaAcct': '1234', 'ariaMPI': 'zxcv'] ]" mimeType="application/java" doc:name="Variable"/>
+
+        <set-payload value="#[getResource('project-tests/inactive-billing-address/mdr-upsert-proj.json').asString()]" mimeType="application/json"/>
+        <set-payload value="#[dw(payload, 'application/java')]" doc:name="Set Payload"/>
+        <set-variable variableName="initialUpsertSfdcProjResponse" value="#[payload]" doc:name="Variable"/>
+
+        <set-payload value="#[getResource('sfdc-query-response.json').asString()]" mimeType="application/json"/>
+        <set-payload value="#[dw(payload, 'application/java')]" doc:name="Set Payload"/>
+        <expression-component doc:name="Set RetroChange">payload.companies[0].retroChange = false;</expression-component>
+
+        <set-variable variableName="theProject" value="#[payload]" doc:name="Variable"/>
+        <set-variable variableName="theCompany" value="#[payload.companies[0]]" doc:name="Variable"/>
+
+        <set-payload value="#[]" mimeType="application/java"/>
+
+        <flow-ref name="reconcileBillingAddress"/>
+
+        <mock:verify-call messageProcessor="mule:sub-flow" times="1" doc:name="Verify Call">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('addBillAddrToSfProjXRefFlow')]"/>
+            </mock:with-attributes>
+        </mock:verify-call>
+        <mock:verify-call messageProcessor="mule:sub-flow" times="1" doc:name="Verify Call">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('addOraSiteToSfProjXRefFlow')]"/>
+            </mock:with-attributes>
+        </mock:verify-call>
+        <mock:verify-call messageProcessor="mule:flow" times="0" doc:name="Verify Call">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="ariaDeactivateWorkflow"/>
+            </mock:with-attributes>
+        </mock:verify-call>
+    </munit:test>
+
+
+    <munit:test name="reconcileBillingAddressCallsWorkflowWhenPerformAriaWorkflowCallIsTrue" description="Test">
+        <mock:when messageProcessor="mule:flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="ariaDeactivateWorkflow"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[NullPayload.getInstance()]"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('addBillAddrToSfProjXRefFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[NullPayload.getInstance()]"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('addOraSiteToSfProjXRefFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[NullPayload.getInstance()]"/>
+        </mock:when>
+
+        <set-variable variableName="ariaValues" value="#[ ['ariaAcct': '1234', 'ariaMPI': 'zxcv'] ]" mimeType="application/java" doc:name="Variable"/>
+        <set-variable variableName="performAriaWorkflowCall" value="#[true]" mimeType="application/java" doc:name="Variable"/>
+
+        <set-payload value="#[getResource('project-tests/inactive-billing-address/mdr-upsert-proj.json').asString()]" mimeType="application/json"/>
+        <set-payload value="#[dw(payload, 'application/java')]" doc:name="Set Payload"/>
+        <set-variable variableName="initialUpsertSfdcProjResponse" value="#[payload]" doc:name="Variable"/>
+
+        <set-payload value="#[getResource('sfdc-query-response.json').asString()]" mimeType="application/json"/>
+        <set-payload value="#[dw(payload, 'application/java')]" doc:name="Set Payload"/>
+        <expression-component doc:name="Set RetroChange">payload.companies[0].retroChange = false;</expression-component>
+
+        <set-variable variableName="theProject" value="#[payload]" doc:name="Variable"/>
+        <set-variable variableName="theCompany" value="#[payload.companies[0]]" doc:name="Variable"/>
+
+        <set-payload value="#[]" mimeType="application/java"/>
+
+        <flow-ref name="reconcileBillingAddress"/>
+
+        <mock:verify-call messageProcessor="mule:flow" times="1" doc:name="Verify Call">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="ariaDeactivateWorkflow"/>
+            </mock:with-attributes>
+        </mock:verify-call>
+    </munit:test>
+</mule>

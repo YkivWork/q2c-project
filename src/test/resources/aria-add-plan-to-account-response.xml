@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns1="urn:client:api:wsdl:document/literal_wrapped:vers:11.0:aria_complete_m_api" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <SOAP-ENV:Body>
+    <ns1:update_acct_plan_multi_mResponseElement>
+      <ns1:error_code>0</ns1:error_code>
+      <ns1:error_msg>OK</ns1:error_msg>
+      <ns1:out_acct_no>1781616</ns1:out_acct_no>
+      <ns1:out_client_acct_id xsi:nil="true"/>
+      <ns1:billing_errors>
+        <ns1:invoicing_error_code>0</ns1:invoicing_error_code>
+        <ns1:invoicing_error_msg>OK</ns1:invoicing_error_msg>
+        <ns1:collection_error_code>-1</ns1:collection_error_code>
+        <ns1:collection_error_msg>not attempted</ns1:collection_error_msg>
+        <ns1:statement_error_code>-1</ns1:statement_error_code>
+        <ns1:statement_error_msg>not attempted</ns1:statement_error_msg>
+        <ns1:billing_group_no>1130721</ns1:billing_group_no>
+        <ns1:client_billing_group_id>1130721</ns1:client_billing_group_id>
+      </ns1:billing_errors>
+      <ns1:plans_updated>
+        <ns1:plan_instance_no>2462549</ns1:plan_instance_no>
+        <ns1:client_plan_instance_id>2462549</ns1:client_plan_instance_id>
+        <ns1:plan_no>32544</ns1:plan_no>
+        <ns1:client_plan_id>DataSite</ns1:client_plan_id>
+        <ns1:plan_name>DataSite</ns1:plan_name>
+        <ns1:plan_operation>1</ns1:plan_operation>
+        <ns1:plan_service_proration_results>
+          <ns1:plan_no>32544</ns1:plan_no>
+          <ns1:client_plan_id>DataSite</ns1:client_plan_id>
+          <ns1:service_no>11060758</ns1:service_no>
+          <ns1:client_service_id>DataSite</ns1:client_service_id>
+          <ns1:proration_result_total>0</ns1:proration_result_total>
+          <ns1:proration_amount>0</ns1:proration_amount>
+          <ns1:proration_tax_charges>0</ns1:proration_tax_charges>
+          <ns1:proration_tax_credits>0</ns1:proration_tax_credits>
+          <ns1:proration_surcharge_amount>0</ns1:proration_surcharge_amount>
+          <ns1:proration_credit_amount>0</ns1:proration_credit_amount>
+          <ns1:proration_start_date>2017-07-07</ns1:proration_start_date>
+          <ns1:proration_end_date>2017-08-06</ns1:proration_end_date>
+        </ns1:plan_service_proration_results>
+      </ns1:plans_updated>
+      <ns1:plans_updated>
+        <ns1:plan_instance_no>2462550</ns1:plan_instance_no>
+        <ns1:client_plan_instance_id>2462550</ns1:client_plan_instance_id>
+        <ns1:plan_no>38794</ns1:plan_no>
+        <ns1:client_plan_id>Special_Media</ns1:client_plan_id>
+        <ns1:plan_name>Special Media</ns1:plan_name>
+        <ns1:plan_operation>1</ns1:plan_operation>
+      </ns1:plans_updated>
+      <ns1:plans_updated>
+        <ns1:plan_instance_no>2462551</ns1:plan_instance_no>
+        <ns1:client_plan_instance_id>2462551</ns1:client_plan_instance_id>
+        <ns1:plan_no>77284</ns1:plan_no>
+        <ns1:client_plan_id>Special_Media_Hosted</ns1:client_plan_id>
+        <ns1:plan_name>Special Media Hosted</ns1:plan_name>
+        <ns1:plan_operation>1</ns1:plan_operation>
+      </ns1:plans_updated>
+      <ns1:plans_updated>
+        <ns1:plan_instance_no>2462552</ns1:plan_instance_no>
+        <ns1:client_plan_instance_id>2462552</ns1:client_plan_instance_id>
+        <ns1:plan_no>38778</ns1:plan_no>
+        <ns1:client_plan_id>Pages_Uploaded</ns1:client_plan_id>
+        <ns1:plan_name>Pages Uploaded</ns1:plan_name>
+        <ns1:plan_operation>1</ns1:plan_operation>
+      </ns1:plans_updated>
+      <ns1:plans_updated>
+        <ns1:plan_instance_no>2462553</ns1:plan_instance_no>
+        <ns1:client_plan_instance_id>2462553</ns1:client_plan_instance_id>
+        <ns1:plan_no>38791</ns1:plan_no>
+        <ns1:client_plan_id>MBs_Uploaded</ns1:client_plan_id>
+        <ns1:plan_name>MBs Uploaded</ns1:plan_name>
+        <ns1:plan_operation>1</ns1:plan_operation>
+      </ns1:plans_updated>
+      <ns1:plans_updated>
+        <ns1:plan_instance_no>2462554</ns1:plan_instance_no>
+        <ns1:client_plan_instance_id>2462554</ns1:client_plan_instance_id>
+        <ns1:plan_no>38789</ns1:plan_no>
+        <ns1:client_plan_id>GBs_Uploaded</ns1:client_plan_id>
+        <ns1:plan_name>GBs Uploaded</ns1:plan_name>
+        <ns1:plan_operation>1</ns1:plan_operation>
+      </ns1:plans_updated>
+      <ns1:plans_updated>
+        <ns1:plan_instance_no>2462555</ns1:plan_instance_no>
+        <ns1:client_plan_instance_id>2462555</ns1:client_plan_instance_id>
+        <ns1:plan_no>38786</ns1:plan_no>
+        <ns1:client_plan_id>Pages_Hosted</ns1:client_plan_id>
+        <ns1:plan_name>Pages Hosted</ns1:plan_name>
+        <ns1:plan_operation>1</ns1:plan_operation>
+      </ns1:plans_updated>
+      <ns1:plans_updated>
+        <ns1:plan_instance_no>2462556</ns1:plan_instance_no>
+        <ns1:client_plan_instance_id>2462556</ns1:client_plan_instance_id>
+        <ns1:plan_no>38792</ns1:plan_no>
+        <ns1:client_plan_id>MBs_Hosted</ns1:client_plan_id>
+        <ns1:plan_name>MBs Hosted</ns1:plan_name>
+        <ns1:plan_operation>1</ns1:plan_operation>
+      </ns1:plans_updated>
+      <ns1:plans_updated>
+        <ns1:plan_instance_no>2462557</ns1:plan_instance_no>
+        <ns1:client_plan_instance_id>2462557</ns1:client_plan_instance_id>
+        <ns1:plan_no>38790</ns1:plan_no>
+        <ns1:client_plan_id>GBs_Hosted</ns1:client_plan_id>
+        <ns1:plan_name>GBs Hosted</ns1:plan_name>
+        <ns1:plan_operation>1</ns1:plan_operation>
+      </ns1:plans_updated>
+      <ns1:billing_groups_updated>
+        <ns1:billing_group_no>1130721</ns1:billing_group_no>
+        <ns1:client_billing_groups_id>1130721</ns1:client_billing_groups_id>
+        <ns1:primary_payment_method_no xsi:nil="true"/>
+        <ns1:primary_client_payment_method_id xsi:nil="true"/>
+        <ns1:backup_payment_method_no xsi:nil="true"/>
+        <ns1:backup_client_payment_method_id xsi:nil="true"/>
+        <ns1:billing_group_operation xsi:nil="true"/>
+      </ns1:billing_groups_updated>
+      <ns1:multi_plan_invoice_details>
+        <ns1:billing_group_no>1130721</ns1:billing_group_no>
+        <ns1:client_billing_group_id>1130721</ns1:client_billing_group_id>
+        <ns1:invoice_no>8158391</ns1:invoice_no>
+        <ns1:proc_cvv_response xsi:nil="true"/>
+        <ns1:proc_avs_response xsi:nil="true"/>
+        <ns1:proc_cavv_response xsi:nil="true"/>
+        <ns1:proc_status_code xsi:nil="true"/>
+        <ns1:proc_status_text xsi:nil="true"/>
+        <ns1:proc_payment_id xsi:nil="true"/>
+        <ns1:proc_auth_code xsi:nil="true"/>
+        <ns1:proc_merch_comments xsi:nil="true"/>
+        <ns1:invoice_charges_before_tax>0</ns1:invoice_charges_before_tax>
+        <ns1:invoice_tax_charges>0</ns1:invoice_tax_charges>
+        <ns1:invoice_charges_after_tax>0</ns1:invoice_charges_after_tax>
+        <ns1:invoice_credit_before_tax>0</ns1:invoice_credit_before_tax>
+        <ns1:invoice_tax_credits>0</ns1:invoice_tax_credits>
+        <ns1:invoice_credits>0</ns1:invoice_credits>
+        <ns1:invoice_total_amount>0</ns1:invoice_total_amount>
+        <ns1:expectd_activation_fee xsi:nil="true"/>
+        <ns1:expectd_mthly_recurring_cost xsi:nil="true"/>
+        <ns1:expectd_annu_recurring_cost xsi:nil="true"/>
+        <ns1:invoice_item_details>
+          <ns1:invoice_line_no>1</ns1:invoice_line_no>
+          <ns1:line_type>1</ns1:line_type>
+          <ns1:plan_no>32544</ns1:plan_no>
+          <ns1:client_plan_id>DataSite</ns1:client_plan_id>
+          <ns1:plan_name>DataSite</ns1:plan_name>
+          <ns1:service_no>11060758</ns1:service_no>
+          <ns1:client_service_id>DataSite</ns1:client_service_id>
+          <ns1:service_name>DataSite</ns1:service_name>
+          <ns1:service_is_tax_ind>0</ns1:service_is_tax_ind>
+          <ns1:plan_instance_no>2462549</ns1:plan_instance_no>
+          <ns1:client_plan_instance_id xsi:nil="true"/>
+          <ns1:line_units>1</ns1:line_units>
+          <ns1:rate_per_unit>0</ns1:rate_per_unit>
+          <ns1:line_amount>0</ns1:line_amount>
+          <ns1:line_base_units>1</ns1:line_base_units>
+          <ns1:proration_factor>1</ns1:proration_factor>
+          <ns1:line_description>DataSite</ns1:line_description>
+          <ns1:start_date_range>2017-07-07</ns1:start_date_range>
+          <ns1:end_date_range>2017-08-06</ns1:end_date_range>
+          <ns1:usage_type_no xsi:nil="true"/>
+          <ns1:usage_type_cd xsi:nil="true"/>
+          <ns1:service_coa_id>10082779</ns1:service_coa_id>
+          <ns1:client_service_coa_code>101.0999.429993</ns1:client_service_coa_code>
+          <ns1:ref_charge_line_no xsi:nil="true"/>
+          <ns1:nso_order_no xsi:nil="true"/>
+          <ns1:nso_order_status_label xsi:nil="true"/>
+          <ns1:client_sku xsi:nil="true"/>
+          <ns1:item_no xsi:nil="true"/>
+          <ns1:client_item_id xsi:nil="true"/>
+          <ns1:credit_coupon_code xsi:nil="true"/>
+          <ns1:credit_reason_code_description xsi:nil="true"/>
+          <ns1:csr_comments xsi:nil="true"/>
+          <ns1:adv_billing_period_total_days xsi:nil="true"/>
+          <ns1:rate_schedule_no>417177</ns1:rate_schedule_no>
+          <ns1:rate_schedule_tier_no>1</ns1:rate_schedule_tier_no>
+          <ns1:bill_from_address_no xsi:nil="true"/>
+          <ns1:ship_from_address_no xsi:nil="true"/>
+          <ns1:bill_to_address_no xsi:nil="true"/>
+          <ns1:ship_to_address_no xsi:nil="true"/>
+          <ns1:proration_text xsi:nil="true"/>
+          <ns1:proration_remaining_days xsi:nil="true"/>
+          <ns1:proration_description xsi:nil="true"/>
+        </ns1:invoice_item_details>
+      </ns1:multi_plan_invoice_details>
+      <ns1:statement_contact_details>
+        <ns1:billing_group_no>1130721</ns1:billing_group_no>
+        <ns1:stmt_contact_no>4625982</ns1:stmt_contact_no>
+      </ns1:statement_contact_details>
+    </ns1:update_acct_plan_multi_mResponseElement>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>

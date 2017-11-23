@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:core="http://www.mulesoft.org/schema/mule/core" xmlns:mock="http://www.mulesoft.org/schema/mule/mock" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/mock http://www.mulesoft.org/schema/mule/mock/current/mule-mock.xsd">
+    <munit:config name="munit" doc:name="MUnit configuration"/>
+    <spring:beans>
+        <spring:import resource="classpath:oracle.xml"/>
+        <spring:import resource="classpath:oracle-auth.xml"/>
+        <spring:import resource="classpath:oracle-lookups.xml"/>
+        <spring:import resource="classpath:sfdc-lookups.xml"/>
+        <spring:import resource="classpath:aria.xml"/>
+        <spring:import resource="classpath:mdr-xrefs.xml"/>
+        <spring:import resource="classpath:mdr-upserts.xml"/>
+        <spring:import resource="classpath:globals.xml"/>
+    </spring:beans>
+    <munit:test name="persistInOracleFlow_PositiveFlowTest" description="Test">
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock Auth">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('getOracleAuthFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="{ }" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:then-return payload="#[getResource('mdr-getcrossreference-response.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('createInOracleFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="{&quot;oracle_project_number&quot; : &quot;a_project_from_oracle&quot;}" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('createOracleProjectAndSFDC_XRef')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[samePayload()]" mimeType="application/json"/>
+        </mock:when>
+        <set-variable variableName="theProject" value="{ &quot;projectSfdcId&quot; :  &quot;SF1&quot;}" mimeType="application/json" doc:name="Variable"/>
+        <set-variable variableName="MDRCrossReferences" value="#[getResource('mdr-getcrossreference-response.json').asString()]" mimeType="application/json" doc:name="Variable"/>
+        <flow-ref name="persistInOracleFlow" doc:name="persistInOracleFlow"/>
+        <mock:verify-call messageProcessor="mule:sub-flow" times="1" doc:name="Verify Call">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('createInOracleFlow')]"/>
+            </mock:with-attributes>
+        </mock:verify-call>
+    </munit:test>
+    <munit:test name="createOracleProjectAndSFDC_XRef_FlowTest" description="Test">
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:then-return payload="{ &quot;status&quot;  : &quot;S&quot;}" mimeType="application/json"/>
+        </mock:when>
+        <munit:set payload="#[]" doc:name="Set Message">
+            <munit:invocation-properties>
+                <munit:invocation-property key="oracle_project_number" value="54"/>
+                <munit:invocation-property key="theProject" value="#[getResource('sfdc-query-response.json').asString()]" mimeType="application/json"/>
+            </munit:invocation-properties>
+        </munit:set>
+        <flow-ref name="createOracleProjectAndSFDC_XRef" doc:name="createOracleProjectAndSFDC_XRef"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <munit:assert-true message="createOracleProjectAndSFDC_XRef_FlowTest failed!" condition="#[payload.status == &quot;S&quot;]" doc:name="Assert True"/>
+    </munit:test>
+
+    <munit:test name="createInOracleFlowFormatsRequestCorrectly" description="Test">
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock Auth">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('getOracleAuthFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="{ }" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${oracle.project.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('oracle-create-project-successful-response.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${oracle.projectMapping.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('oracle-project-org-map-response.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+        <mock:spy messageProcessor="http:request" doc:name="Spy">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${oracle.project.path}"/>
+            </mock:with-attributes>
+            <mock:assertions-before-call>
+                <object-to-string-transformer doc:name="Object to String" mimeType="application/json"/>
+                <set-variable variableName="payloadAsMap" value="#[dw(payload, 'application/java')]" doc:name="Variable"/>
+                <munit:assert-on-equals message="SOURCE_SYSTEM is invalid" expectedValue="XXSF" actualValue="#[flowVars.payloadAsMap.CREATE_PROJECT_Input.InputParameters.P_PROJECT.SOURCE_SYSTEM]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="SOURCE_PROJECT_NUMBER is invalid" expectedValue="a27c0000005RJZjAAO" actualValue="#[flowVars.payloadAsMap.CREATE_PROJECT_Input.InputParameters.P_PROJECT.SOURCE_PROJECT_NUMBER]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="PROJECT_NAME is invalid" expectedValue="MS Test 23rd" actualValue="#[flowVars.payloadAsMap.CREATE_PROJECT_Input.InputParameters.P_PROJECT.PROJECT_NAME]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="DESCRIPTION is invalid" expectedValue="MS Test 23rd" actualValue="#[flowVars.payloadAsMap.CREATE_PROJECT_Input.InputParameters.P_PROJECT.DESCRIPTION]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="PROJECT_START_DATE is invalid" expectedValue="2017-03-06T19:23:23.000Z" actualValue="#[flowVars.payloadAsMap.CREATE_PROJECT_Input.InputParameters.P_PROJECT.PROJECT_START_DATE]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="OPERATING_UNIT_ID is invalid" expectedValue="21" actualValue="#[flowVars.payloadAsMap.CREATE_PROJECT_Input.InputParameters.P_PROJECT.OPERATING_UNIT_ID]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="PRODUCT_TYPE is invalid" expectedValue="DATASITE-ASSET SALE" actualValue="#[flowVars.payloadAsMap.CREATE_PROJECT_Input.InputParameters.P_PROJECT.PRODUCT_TYPE]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="ORGANIZATION_ID is invalid" expectedValue="76" actualValue="#[flowVars.payloadAsMap.CREATE_PROJECT_Input.InputParameters.P_PROJECT.ORGANIZATION_ID]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="BILLABLE is invalid" expectedValue="Y" actualValue="#[flowVars.payloadAsMap.CREATE_PROJECT_Input.InputParameters.P_PROJECT.BILLABLE]" doc:name="Assert Equals"/>
+            </mock:assertions-before-call>
+        </mock:spy>
+        <munit:set payload="{}" mimeType="application/json" doc:name="Set Message"/>
+        <set-variable variableName="theProject" value="#[getResource('sfdc-query-response.json').asString()]" mimeType="application/json" doc:name="Variable"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="theProject"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.theProject]]></dw:set-variable>
+        </dw:transform-message>
+
+        <flow-ref name="createInOracleFlow" doc:name="createInOracleFlow"/>
+
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="oracleResult"><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-variable>
+        </dw:transform-message>
+    </munit:test>
+
+    <munit:test name="oracle-tests-subString30_Test" description="Test">
+        <expression-component doc:name="Expression"><![CDATA[flowVars.test52="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXZ";
+flowVars.test7="Merrill";]]></expression-component>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%function subString30(aString) (aString when (sizeOf aString) < 31 otherwise aString[0..29])  
+---
+{
+  test52: subString30(flowVars.test52),
+  test7:  subString30(flowVars.test7)
+}
+]]></dw:set-payload>
+        </dw:transform-message>
+        <munit:assert-on-equals message="failed on test52" expectedValue="#[flowVars.test52.substring(0,30)]" actualValue="#[payload.test52]" doc:name="Assert Equals Test52"/>
+        <munit:assert-on-equals message="failed on test7" expectedValue="#[flowVars.test7]" actualValue="#[payload.test7]" doc:name="Assert Equals Test7"/>
+    </munit:test>
+</mule>

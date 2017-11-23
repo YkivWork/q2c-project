@@ -1,0 +1,81 @@
+{
+  "id": "59145dea1c75920010025ea2",
+  "info": {
+    "name": "MS Test jdz 1",
+    "description": "MS Test jdz 1",
+    "externalId": "jdzc0000005RIg4AAG",
+    "dataCenter": "US",
+    "productCode": "MANDA",
+    "emailId": "leeanne.larson@merrillcorp.com",
+    "scheduledActivationDate": 1493906511969,
+    "state": "Preparation",
+    "demo": false
+  },
+  "deleted": false,
+  "configurations": [
+    {
+      "settingName": "watermarkText",
+      "value": "Confidential",
+      "configuration": "watermark"
+    },
+    {
+      "settingName": "enableWatermark",
+      "value": "true",
+      "configuration": "watermark"
+    },
+    {
+      "settingName": "disclaimerTitleText",
+      "value": "Condition of Access",
+      "configuration": "disclaimer"
+    },
+    {
+      "settingName": "disclaimerTitle",
+      "value": "I am being granted access to the information contained on this site in order to review certain information of Project MS Test jdz 1 or their affiliates. I understand that my access to this site is subject to the following conditions : All of the information contained on this site is considered confidential, and is subject to the Confidentiality Agreement entered into between Project MS Test jdz 1 and the company that I represent. I will maintain the information in confidence and will not disclose any of the information to others except as expressly permitted by the Confidentiality Agreement.I will not attempt to download, scan, copy, print or otherwise capture any of the information contained on the site, except that I may view, print or download information for which the view, print or download capability has been enabled as indicated by the site index. I will not attempt to circumvent any of the security features of the site, and will not enable or allow others to access the site using my authorization to the site. The information on this site has been prepared to assist interested parties in making their own evaluation of a prospective transaction with Project MS Test jdz 1, and Project MS Test jdz 1 does not represent the information as being all-inclusive or to contain all information that may be desirable or required in order to properly evaluate a potential transaction.I understand that Project MS Test jdz 1 is making no representations or warranties, express or implied, as to the accuracy or completeness of the information, and that Project MS Test jdz 1 will have no liability with respect to any use or reliance upon any of the information.By clicking on the I Accept button below, I acknowledge that I have read, understand, and agree to the above conditions.",
+      "configuration": "disclaimer"
+    },
+    {
+      "settingName": "disclaimerFrequency",
+      "value": "EVERY_LOGIN",
+      "configuration": "disclaimer"
+    },
+    {
+      "settingName": "enableUserName",
+      "value": "true",
+      "configuration": "watermark"
+    },
+    {
+      "settingName": "enableDateTime",
+      "value": "true",
+      "configuration": "watermark"
+    },
+    {
+      "settingName": "enableOfficeIntegration",
+      "value": "true",
+      "configuration": "officeintegration"
+    },
+    {
+      "settingName": "manualDocProcessingSupport",
+      "value": "false",
+      "configuration": "manualDocProcessingSupport"
+    },
+    {
+      "settingName": "enableEmailAlerts",
+      "value": "false",
+      "configuration": "emailAlerts"
+    }
+  ],
+  "entitlements": [
+    {
+      "entitlementCode": "VDR",
+      "enabled": true
+    },
+    {
+      "entitlementCode": "SecureExcelViewer",
+      "enabled": true
+    },
+    {
+      "entitlementCode": "QA",
+      "enabled": true
+    }
+  ]
+}

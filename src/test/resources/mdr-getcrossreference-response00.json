@@ -1,0 +1,64 @@
+[
+ {
+    "STARTDATE": "2017-01-04T00:00:00",
+    "IdentifierValue": "Aria10",
+    "EntityTypeKey": "ORG",
+    "ENDDATE": "2017-03-31T00:00:00",
+    "Qualifier2Key": "LEGALENT",
+    "ISDELETED": 0,
+    "Qualifier2Value": "LLC",
+    "IdentifierTypeKey": "Aria_Acct",
+    "Qualifier1Key": "CURRENCY",
+    "Qualifier1Value": "USD"
+  },
+  {
+    "STARTDATE": "2017-01-10T00:00:00",
+    "IdentifierValue": "ORA33",
+    "EntityTypeKey": "ORG",
+    "ENDDATE": "2017-03-31T00:00:00",
+    "Qualifier2Key": null,
+    "ISDELETED": 0,
+    "Qualifier2Value": null,
+    "IdentifierTypeKey": "ORA_Proj",
+    "Qualifier1Key": "VAT",
+    "Qualifier1Value": "VAT3"
+  },
+  {
+    "STARTDATE": "2017-01-10T00:00:00",
+    "IdentifierValue": "DS1",
+    "EntityTypeKey": "PROJ",
+    "ENDDATE": "2017-03-31T00:00:00",
+    "Qualifier2Key": null,
+    "ISDELETED": 0,
+    "Qualifier2Value": null,
+    "IdentifierTypeKey": "DS1_Proj",
+    "Qualifier1Key": null,
+    "Qualifier1Value": null
+  },
+  {
+    "IdentifierValue": "a2dS0000000QsSQIA0",
+    "EntityTypeKey": "PROJ",
+    "IdentifierTypeKey": "SF_BILLCO"
+  },
+  {
+    "STARTDATE": "2016-11-20T00:00:00",
+    "IdentifierValue": "Aria200",
+    "EntityTypeKey": "PROJ",
+    "ENDDATE": "2017-03-14T00:00:00",
+    "Qualifier2Key": "LEGALENT",
+    "ISDELETED": 0,
+    "Qualifier2Value": "LLC",
+    "IdentifierTypeKey": "Aria_Acct",
+    "Qualifier1Key": "CURRENCY",
+    "Qualifier1Value": "USD"
+  },
+  {
+    "STARTDATE": "2016-11-20T00:00:00",
+    "IdentifierValue": "some-aria-mpi",
+    "EntityTypeKey": "PROJ",
+    "ISDELETED": 0,
+    "IdentifierTypeKey": "Aria_MPI",
+    "Qualifier1Key": "Aria_ACCT",
+    "Qualifier1Value": "aria-acct-id"
+  }
+]

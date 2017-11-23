@@ -1,0 +1,28 @@
+{
+  "configurations": [
+    {
+      "configuration": "string",
+      "settingName": "string",
+      "value": "string"
+    }
+  ],
+  "deleted": true,
+  "entitlements": [
+    {
+      "enabled": true,
+      "entitlementCode": "string"
+    }
+  ],
+  "id": "string",
+  "info": {
+    "dataCenter": "string",
+    "demo": true,
+    "description": "string",
+    "emailId": "string",
+    "externalId": "string",
+    "name": "string",
+    "productCode": "string",
+    "scheduledActivationDate": 0,
+    "state": "string"
+  }
+}

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore"
+	xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+	xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+
+    <flow name="GET_COMPANY_HISTORY_PROJECT_IDS" processingStrategy="synchronous">
+        <vm:inbound-endpoint exchange-pattern="request-response" path="VM_GET_COMPANY_HISTORY_PROJECT_IDS" connector-ref="VM_IN_MEMORY" doc:name="VM_GET_COMPANY_HISTORY_PROJECT_IDS"/>
+        <objectstore:contains config-ref="Project_Company_History_Object_Store" key="lastMaxCompanyHistoryId" doc:name="ObjectStore"/>
+
+        <choice doc:name="Choice">
+            <when expression="#[payload != &quot;&quot;]">
+                <objectstore:retrieve config-ref="Project_Company_History_Object_Store" key="lastMaxCompanyHistoryId" doc:name="Retrieve Last Max Project History Id"/>
+                <logger message="***Last Max Company History Id: #[message.payloadAs(java.lang.String)]" level="INFO" category="getCompanyHistoryProjectIds" doc:name="[DEBUG]Log lastMaxCompanyHistoryId"/>
+                <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select      max(id) id     , DatasiteOne_Company__c  from DatasiteOne_Company_History__c  where id &gt; '#[payload]'   group by   DatasiteOne_Company__c  " doc:name="Salesforce"/>
+            </when>
+            <otherwise>
+                <logger message="Using YESTERDAY instead of MAX COMPANY HISTORY ID" level="WARN" category="GET_COMPANY_HISTORY_PROJECT_IDS" doc:name="[WARN]USING DATE INSTEAD OF MAX ID"/>
+                <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select      max(id)  id    , DatasiteOne_Company__c   from DatasiteOne_Company_History__c   where createdDate &gt; YESTERDAY group by DatasiteOne_Company__c  " doc:name="Salesforce"/>
+            </otherwise>
+        </choice>
+        <json:object-to-json-transformer mimeType="application/json" doc:name="Object to JSON"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <choice doc:name="Choice">
+            <when expression="#[payload.size() &gt; 0]">
+                <logger message="***Get Company History Size &gt; 0: #[message.payloadAs(java.lang.String)]" level="INFO" category="getCompanyHistoryProjectIds" doc:name="[DEBUG] Log Message"/>
+                <expression-component doc:name="Persist SFDC Response"><![CDATA[flowVars.sfdcResponse=payload;]]></expression-component>
+                <dw:transform-message doc:name="Retrieve Max Company History Id">
+                    <dw:input-payload/>
+                    <dw:set-variable variableName="maxCompanyHistoryId"><![CDATA[%dw 1.0
+%output application/java
+---
+(payload orderBy $.id)[-1..0][0]
+]]></dw:set-variable>
+                </dw:transform-message>
+                <logger message="***Company History Id: #[flowVars.maxCompanyHistoryId.id]  - DatasiteOne_Company__c: #[flowVars.maxCompanyHistoryId.DatasiteOne_Company__c]" level="INFO" category="getCompanyHistoryProjectIds" doc:name="[DEBUG]Log Max Company History Id"/>
+                <objectstore:store config-ref="Project_Company_History_Object_Store" key="lastMaxCompanyHistoryId" value-ref="#[flowVars.maxCompanyHistoryId.id]" overwrite="true" doc:name="Store Max Company History Id"/>
+                <set-payload value="#[flowVars.sfdcResponse]" doc:name="Set Payload to SFDC Response"/>
+                <logger message="***Get Company History - SFDC Response before final Transformation: #[message.payloadAs(java.lang.String)]" level="INFO" category="getCompanyHistoryProjectIds" doc:name="[DEBUG]Log SFDC Response"/>
+                <dw:transform-message doc:name="Transform Message">
+                    <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+	id: $.id,
+	DatasiteOne_Project__c: lookup('GET_COMPANY_BY_COMPANY_ID',{ParentId: $.DatasiteOne_Company__c})[0].DatasiteOne_Project__c
+	
+}]]></dw:set-payload>
+                </dw:transform-message>
+            </when>
+            <otherwise>
+                <set-payload value="[]" mimeType="application/json" doc:name="Set Payload"/>
+            </otherwise>
+        </choice>
+        
+        <json:object-to-json-transformer mimeType="application/json" doc:name="Object to JSON"/>
+        
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="#[exception.getSummaryMessage()]" level="ERROR" category="GET_COMPANY_HISTORY_PROJECT_IDS" doc:name="Log Exception"/>
+            <set-payload value="Unable to retrieve Company History" doc:name="Set Payload"/>
+            <set-property propertyName="http.status" value="#[400]" doc:name="400"/>
+        </catch-exception-strategy>
+    </flow>
+
+
+</mule>

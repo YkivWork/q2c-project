@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting"
+	xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+
+    <sub-flow name="upsertPROJ:SF_PROJ">
+        <dw:transform-message doc:name="Transform Message">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+  entity_type_key: 'PROJ',
+  id_type_key: 'SF_PROJ',
+  id_value: flowVars.theProject.projectSfdcId,
+  descriptor1: 'Test Project'
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <logger message="system=MDR method=PROJ:SF_PROJ action=request projectId=#[flowVars.projectId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <logger message="system=MDR method=PROJ:SF_PROJ action=request projectId=#[flowVars.projectId] payload=#[message.payloadAs(java.lang.String)]" category="com.merrillcorp.q2c" level="DEBUG" doc:name="Logger"/>
+
+        <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="setPayloadBeforeUntilSuccess"/>
+        <until-successful maxRetries="${mdr.http.max.retries}" millisBetweenRetries="${mdr.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful">
+            <http:request config-ref="mdrSystemRequestConfiguration" path="${mdr.upsertinstance.path}" method="POST" doc:name="Post MDR Upsert">
+                <http:request-builder>
+                    <http:header headerName="Content-Type" value="application/json"/>
+                </http:request-builder>
+            </http:request>
+        </until-successful>
+
+        <set-payload value="#[dw('payload', 'application/java')]"/>
+
+        <logger message="system=MDR method=PROJ:SF_PROJ action=response projectId=#[flowVars.projectId] recordCount=#[payload.size()]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <logger message="system=MDR method=PROJ:SF_PROJ action=response projectId=#[flowVars.projectId] payload=#[message.payloadAs(java.lang.String)]" category="com.merrillcorp.q2c" level="DEBUG" doc:name="Logger"/>
+
+    </sub-flow>
+
+
+    <sub-flow name="upsertORG:SF_BILLCO">
+        <dw:transform-message doc:name="Transform Message">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+  entity_type_key: 'ORG',
+
+  id_type_key: 'SF_BILLCO',
+  id_value: flowVars.theCompany.billingCompany.sfdcId,
+
+  qualifier1_key: 'VAT',
+  qualifier1_value: flowVars.theCompany.billingCompany.vatRegistration
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <logger message="system=MDR method=ORG:SF_BILLCO action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <logger message="system=MDR method=ORG:SF_BILLCO action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" category="com.merrillcorp.q2c" level="DEBUG" doc:name="Logger"/>
+
+        <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="setPayloadBeforeUntilSuccess"/>
+        <until-successful maxRetries="${mdr.http.max.retries}" millisBetweenRetries="${mdr.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful">
+            <http:request config-ref="mdrSystemRequestConfiguration" path="${mdr.upsertinstance.path}" method="POST" doc:name="Post MDR Upsert"/>
+        </until-successful>
+
+        <set-payload value="#[dw('payload', 'application/java')]"/>
+
+        <logger message="system=MDR method=ORG:SF_BILLCO action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] recordCount=#[payload.size()]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <logger message="system=MDR method=ORG:SF_BILLCO action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" category="com.merrillcorp.q2c" level="DEBUG" doc:name="Logger"/>
+    </sub-flow>
+
+    <sub-flow name="upsertORGADDR:SF_BILLADDR">
+        <dw:transform-message doc:name="Transform Message">
+            <dw:input-payload mimeType="application/java"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+  entity_type_key: 'ORGADDR',
+  id_type_key: 'SF_BILLADDR',
+  id_value: flowVars.theCompany.billingAddress.sfdcId,
+
+  qualifier1_key: 'OPERUNIT',
+  qualifier1_value: flowVars.theProject.operatingUnitName,
+
+  descriptor1: flowVars.theCompany.billingAddress.address1
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="system=MDR method=ORGADDR:SF_BILLADDR action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <logger message="system=MDR method=ORGADDR:SF_BILLADDR action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" category="com.merrillcorp.q2c" level="DEBUG" doc:name="Logger"/>
+
+        <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="setPayloadBeforeUntilSuccess"/>
+        <until-successful maxRetries="${mdr.http.max.retries}" millisBetweenRetries="${mdr.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful">
+            <http:request config-ref="mdrSystemRequestConfiguration" path="${mdr.upsertinstance.path}" method="POST" doc:name="Post MDR Upsert"/>
+        </until-successful>
+
+        <set-payload value="#[dw('payload', 'application/java')]"/>
+
+        <logger message="system=MDR method=ORGADDR:SF_BILLADDR action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] recordCount=#[payload.size()]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <logger message="system=MDR method=ORGADDR:SF_BILLADDR action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" category="com.merrillcorp.q2c" level="DEBUG" doc:name="Logger"/>
+    </sub-flow>
+    
+</mule>

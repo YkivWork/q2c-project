@@ -1,0 +1,535 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting"
+xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+xmlns:json="http://www.mulesoft.org/schema/mule/json"
+xmlns:http="http://www.mulesoft.org/schema/mule/http"
+xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+xmlns="http://www.mulesoft.org/schema/mule/core"
+xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+xmlns:spring="http://www.springframework.org/schema/beans"
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:schemaLocation="http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd">
+
+    <sub-flow name="createInAriaFlow">
+        <logger message="flow=createInAriaFlow action=started projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <enricher doc:name="Message Enricher" target="variable:salesReps">
+            <flow-ref name="lookupSalesRepFlow" doc:name="lookupSalesRepFlow"/>
+        </enricher>
+
+        <dw:transform-message doc:name="Transform Message">
+            <dw:input-payload doc:sample="create-project-model.json"/>
+            <dw:set-payload resource="classpath:create-account.dwl"/>
+        </dw:transform-message>
+
+        <logger message="system=Aria method=CreateProject action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <logger message="system=Aria method=CreateProject action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="setPayloadBeforeUntilSuccess"/>
+        <until-successful maxRetries="${aria.http.max.retries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful" millisBetweenRetries="${aria.http.milliSecondsBetweenRetries}">
+            <http:request config-ref="ariaRequestConfiguration" path="${aria.path}" method="POST" doc:name="PostToAria">
+                <http:request-builder>
+                    <http:header headerName="SOAPAction" value="&quot;create_acct_complete_m&quot;"/>
+                </http:request-builder>
+            </http:request>
+        </until-successful>
+
+        <logger message="system=Aria method=CreateProject action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <dw:transform-message doc:name="Parse Aria Response">
+          <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%namespace env http://schemas.xmlsoap.org/soap/envelope/
+%namespace aria urn:client:api:wsdl:document/literal_wrapped:vers:11.0:aria_complete_m_api
+%var responseElement = payload.env#Envelope.env#Body.aria#create_acct_complete_mResponseElement
+---
+{
+  planInstanceNumber: responseElement.out_acct.master_plans_assigned.client_plan_instance_id,
+  accountNumber: responseElement.out_acct[0].acct_no,
+  errorMessage: responseElement.error_msg
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <choice doc:name="Choice">
+            <when expression="payload.errorMessage == 'OK'">
+                <logger message="system=Aria method=CreateAcct action=parsed projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] errorMessage=#[payload.errorMessage] planInstanceNumber=#[payload.planInstanceNumber] accountNumber=#[payload.accountNumber]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+            </when>
+            <otherwise>
+                <logger message="system=aria method=CreateProject action=failed projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[flowVars.ariaResults]" level="ERROR" doc:name="Logger" category="com.merrillcorp.q2c"/>
+                <filter ref="Aria_Response_Evaluation" doc:name="Filter Reference"/>
+            </otherwise>
+        </choice>
+
+        <logger message="flow=createInAriaFlow action=completed projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+    </sub-flow>
+
+    <sub-flow name="createNewPlanInAriaFlow">
+        <logger message="flow=createNewPlanInAriaFlow action=started projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <enricher target="variable:salesReps" doc:name="Message Enricher">
+            <flow-ref name="lookupSalesRepFlow" doc:name="lookupSalesRepFlow"/>
+        </enricher>
+
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload resource="classpath:create-new-plan-for-account.dwl"/>
+        </dw:transform-message>
+
+        <logger message="system=Aria method=AddNewPlan action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <logger message="system=Aria method=AddNewPlan action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="setPayloadBeforeUntilSuccess"/>
+        <until-successful maxRetries="${aria.http.max.retries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful" millisBetweenRetries="${aria.http.milliSecondsBetweenRetries}">
+            <http:request config-ref="ariaRequestConfiguration" path="${aria.path}" method="POST" doc:name="PostToAria">
+                <http:request-builder>
+                    <http:header headerName="SOAPAction" value="&quot;update_acct_plan_multi_m&quot;"/>
+                </http:request-builder>
+            </http:request>
+        </until-successful>
+
+        <logger message="system=Aria method=AddNewPlan action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <logger message="system=Aria method=AddNewPlan action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <dw:transform-message doc:name="Parse Aria Response">
+            <dw:input-payload doc:sample="sample_data\empty_2.xml"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%namespace env http://schemas.xmlsoap.org/soap/envelope/
+%namespace aria urn:client:api:wsdl:document/literal_wrapped:vers:11.0:aria_complete_m_api
+
+%var responseElement = payload.env#Envelope.env#Body.aria#update_acct_plan_multi_mResponseElement
+---
+{
+  accountNumber: flowVars.ariaValues.ariaAcct,
+  planInstanceNumber: responseElement.*plans_updated[?($.client_plan_id == "DataSite")][0].client_plan_instance_id,
+  errorMessage: responseElement.error_msg
+} ]]></dw:set-payload>
+        </dw:transform-message>
+
+        <choice doc:name="Choice">
+            <when expression="payload.errorMessage == 'OK'">
+                <logger message="system=Aria method=AddNewPlan action=parsed projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] errorMessage=#[payload.errorMessage] accountNumber=#[payload.accountNumber] planInstanceNumber=#[payload.planInstanceNumber]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+            </when>
+            <otherwise>
+                <logger message="system=aria method=AddNewPlan action=failed projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[flowVars.ariaResults]" level="ERROR" category="com.merrillcorp.q2c" doc:name="Logger"/>
+                <filter ref="Aria_Response_Evaluation" doc:name="Filter Reference"/>
+            </otherwise>
+        </choice>
+
+        <logger message="flow=createNewPlanInAriaFlow action=completed projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+    </sub-flow>
+
+    <sub-flow name="updateInAriaFlow">
+        <logger message="flow=updateInAriaFlow action=started projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <enricher target="variable:salesReps" doc:name="Message Enricher">
+            <flow-ref name="lookupSalesRepFlow" doc:name="lookupSalesRepFlow"/>
+        </enricher>
+
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload resource="classpath:update-account.dwl"/>
+        </dw:transform-message>
+
+        <logger message="system=Aria method=UpdateProject action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <logger message="system=Aria method=UpdateProject action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="setPayloadBeforeUntilSuccess"/>
+        <until-successful maxRetries="${aria.http.max.retries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful" millisBetweenRetries="${aria.http.milliSecondsBetweenRetries}">
+            <http:request config-ref="ariaRequestConfiguration" path="${aria.path}" method="POST" doc:name="PostToAria">
+                <http:request-builder>
+                    <http:header headerName="SOAPAction" value="&quot;update_acct_plan_multi_m&quot;"/>
+                </http:request-builder>
+            </http:request>
+        </until-successful>
+
+        <logger message="system=Aria method=UpdateProject action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <logger message="system=Aria method=UpdateProject action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <dw:transform-message doc:name="Parse Aria Response">
+            <dw:input-payload doc:sample="sample_data\empty_1.xml"/>
+          <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%namespace env http://schemas.xmlsoap.org/soap/envelope/
+%namespace aria urn:client:api:wsdl:document/literal_wrapped:vers:11.0:aria_complete_m_api
+%var responseElement = payload.env#Envelope.env#Body.aria#update_acct_plan_multi_mResponseElement
+---
+{
+  accountNumber: responseElement.out_acct_no,
+  errorMessage: responseElement.error_msg
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <choice doc:name="Choice">
+            <when expression="payload.errorMessage == 'OK'">
+                <logger message="system=Aria method=UpdateProject action=parsed projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] errorMessage=#[payload.errorMessage] accountNumber=#[payload.accountNumber]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+            </when>
+            <otherwise>
+                <logger message="system=aria method=UpdateProject action=failed projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[flowVars.ariaResults]" level="ERROR" category="com.merrillcorp.q2c" doc:name="Logger"/>
+                <filter ref="Aria_Response_Evaluation" doc:name="Filter Reference"/>
+            </otherwise>
+        </choice>
+
+        <logger message="flow=updateInAriaFlow action=started projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+    </sub-flow>
+
+     <sub-flow name="updateAriaContactFlow">
+        <logger message="flow=updateAriaContactFlow action=started projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" doc:name="Logger"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace aria urn:client:api:wsdl:document/literal_wrapped:vers:11.0:aria_complete_m_api
+%namespace soap http://schemas.xmlsoap.org/soap/envelope/
+---
+{
+  soap#Envelope: {
+    soap#Header: {},
+    soap#Body: {
+      aria#get_acct_billing_group_details_m: {
+        client_no: p('aria.client_no'),
+        auth_key: p('aria.auth_key'),
+        acct_no: flowVars.ariaValues.ariaAcct
+      }
+    }
+  }
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="system=Aria method=GetBillingGroup action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <until-successful maxRetries="${aria.http.max.retries}" millisBetweenRetries="${aria.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful">
+            <http:request config-ref="ariaRequestConfiguration" path="${aria.path}" method="POST" doc:name="BillingNumber">
+                <http:request-builder>
+                    <http:header headerName="SOAPAction" value="&quot;get_acct_billing_group_details_m&quot;"/>
+                </http:request-builder>
+            </http:request>
+        </until-successful>
+        <logger message="system=Aria method=GetBillingGroup action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <dw:transform-message doc:name="Extract Billing Number">
+            <dw:input-payload doc:sample="sample_data\Envelope.xml"/>
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%namespace env http://schemas.xmlsoap.org/soap/envelope/
+%namespace aria urn:client:api:wsdl:document/literal_wrapped:vers:11.0:aria_complete_m_api
+%var responseElement = payload.env#Envelope.env#Body.aria#get_acct_billing_group_details_mResponseElement
+%var id = flowVars.ariaValues.ariaMPI as :string when flowVars.ariaValues.ariaMPI != null otherwise 0
+%var index = ((responseElement.*billing_groups.master_plans_summary.client_plan_instance_id) find id)[0]
+---
+{
+  //TODO Doesn't look like errorMessage, errorCode, nor clientBillingGroupId is used.
+  //Remove if not needed
+  errorMessage:         responseElement.error_msg,
+  errorCode:            responseElement.error_code,
+  clientBillingGroupId: responseElement.billing_groups.client_billing_group_id,
+  billingGroupNumber:   responseElement.*billing_groups[index].billing_group_no when index != null otherwise "No Match Found"
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <logger message="system=Aria method=BillingNumber action=results projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] billingNumber=#[payload.billingGroupNumber]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace aria urn:client:api:wsdl:document/literal_wrapped:vers:11.0:aria_complete_m_api
+%namespace soap http://schemas.xmlsoap.org/soap/envelope/
+---
+{
+  soap#Envelope: {
+    soap#Header: {},
+    soap#Body: {
+      aria#update_contact_m: {
+        client_no: p('aria.client_no'),
+        auth_key: p('aria.auth_key'),
+        acct_no: flowVars.ariaValues.ariaAcct,
+        contact_ind: 4,
+        billing_group_no: payload.billingGroupNumber,
+        first_name: flowVars.theCompany.firstName,
+        last_name: flowVars.theCompany.lastName,
+        company_name: flowVars.theCompany.billingCompany.name,
+        address1: flowVars.theCompany.billingAddress.address1,
+        address2: flowVars.theCompany.billingAddress.address2,
+        address3: flowVars.theCompany.billingAddress.address3,
+        city: flowVars.theCompany.billingAddress.city,
+        locality: flowVars.theCompany.billingAddress.locality,
+        state_prov: flowVars.theCompany.billingAddress.stateProvince,
+        country_cd: flowVars.theCompany.billingAddress.country,
+        postal_cd: flowVars.theCompany.billingAddress.postalCode,
+        phone: flowVars.theCompany.phone,
+        email: flowVars.theCompany.email
+      }
+    }
+  }
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <logger message="system=Aria method=UpdateContact action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="INFO" doc:name="Logger"/>
+        <until-successful maxRetries="${aria.http.max.retries}" millisBetweenRetries="${aria.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful">
+            <http:request config-ref="ariaRequestConfiguration" path="${aria.path}" method="POST" doc:name="PostToAria">
+                <http:request-builder>
+                    <http:header headerName="SOAPAction" value="&quot;update_contact_m&quot;"/>
+                </http:request-builder>
+            </http:request>
+        </until-successful>
+        <logger message="system=Aria method=UpdateContact action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="INFO" doc:name="Logger"/>
+
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%namespace env http://schemas.xmlsoap.org/soap/envelope/
+%namespace aria urn:client:api:wsdl:document/literal_wrapped:vers:11.0:aria_complete_m_api
+%var responseElement = payload.env#Envelope.env#Body.aria#update_contact_mResponseElement
+---
+{
+  errorMessage: responseElement.error_msg,
+  contactNumber: responseElement.contact_no
+}
+]]></dw:set-payload>
+        </dw:transform-message>
+
+        <choice doc:name="Choice">
+            <when expression="payload.errorMessage == 'OK'">
+                <logger message="system=Aria method=UpdateContact action=parsed projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] contactNumber=#[payload.contactNumber]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+            </when>
+            <otherwise>
+                <logger message="system=aria method=UpdateContact action=failed projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[flowVars.ariaResults]" level="ERROR" category="com.merrillcorp.q2c" doc:name="Logger"/>
+                <filter ref="Aria_Response_Evaluation" doc:name="Filter Reference"/>
+            </otherwise>
+        </choice>
+        <logger message="flow=updateAriaContactFlow action=completed projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+
+    <sub-flow name="getAriaAcctDetailsFlow">
+        <!--
+        TODO I have seen a few instances were this code was called when it shouldn't have been.
+        This should already have been called right before any update call, or immediately after a create call.
+        If we find instances where this call is duplicated, we might want to cache the response for some given Acct/MPI.
+        -->
+        <logger message="flow=getAriaAcctDetailsFlow action=started projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <dw:transform-message doc:name="Prepare SOAP Payload for GetAcctDetails">
+            <dw:set-payload resource="classpath:get-aria-account-details.dwl"/>
+        </dw:transform-message>
+
+        <object-to-string-transformer doc:name="Object to String"/>
+
+        <logger message="system=Aria method=GetAccountDetails action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <logger message="system=Aria method=GetAccountDetails action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="setPayloadBeforeUntilSuccess"/>
+
+        <!--
+        TODO No checking of a success result happens. No parsing of the response.
+        -->
+        <until-successful maxRetries="${aria.http.max.retries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful" millisBetweenRetries="${aria.http.milliSecondsBetweenRetries}">
+            <http:request config-ref="ariaRequestConfiguration" path="${aria.path}" method="POST" doc:name="GetAccountDetailsFromAria">
+                <http:request-builder>
+                    <http:header headerName="SOAPAction" value="&quot;get_acct_details_all_m&quot;"/>
+                </http:request-builder>
+            </http:request>
+        </until-successful>
+
+        <logger message="system=Aria method=GetAccountDetails action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload is #[message.payloadAs(java.lang.String)]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <logger message="flow=getAriaAcctDetailsFlow action=completed projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+    </sub-flow>
+
+    <sub-flow name="parseAriaCurrentEntitlementAndStateForMPIFlow">
+        <logger message="flow=parseAriaCurrentEntitlementAndStateForMPIFlow action=started projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <dw:transform-message doc:name="Parse for entitlements and state">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%namespace env http://schemas.xmlsoap.org/soap/envelope/
+%namespace aria urn:client:api:wsdl:document/literal_wrapped:vers:11.0:aria_complete_m_api
+
+%var responseElement = read(flowVars.ariaAcctDetails, 'application/xml').Envelope.Body.get_acct_details_all_mResponseElement
+
+%var masterPlan = responseElement.*master_plans_info[?( $.client_master_plan_instance_id == flowVars.ariaValues.ariaMPI )][0]
+%var entitlements = masterPlan.*mp_plan_inst_fields[?( $.plan_instance_field_name == 'CURRENT_ENTITLEMENT' )][0].plan_instance_field_value
+%var projectPhase = masterPlan.*mp_plan_inst_fields[?( $.plan_instance_field_name == 'PROJECT_PHASE' )][0].plan_instance_field_value
+---
+{
+  errorMessage: responseElement.error_msg,
+  errorCode: responseElement.error_code,
+
+  entitlements: entitlements,
+  state: projectPhase
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <logger message="method=AriaEntitlements action=parsed payload=#[message.payloadAs(java.lang.String)]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <logger message="flow=parseAriaCurrentEntitlementAndStateForMPIFlow action=completed projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+    </sub-flow>
+    <flow name="putAriaAdjustPlanBillingDates" processingStrategy="synchronous">
+        <vm:inbound-endpoint exchange-pattern="request-response" path="vmPutAriaAdjustPlanBillingDates" connector-ref="VM_IN_MEMORY" doc:name="Adjust Plan Billing Dates"/>
+        <logger message="Flow: #[flow.name] Action=Started" level="INFO" category="mrll.project.aria" doc:name="Log Flow Start"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace aria urn:client:api:wsdl:document/literal_wrapped:vers:11.0:aria_complete_m_api
+%namespace soap http://schemas.xmlsoap.org/soap/envelope/
+---
+{
+  soap#Envelope: {
+    soap#Header: {},
+    soap#Body: {
+      aria#adjust_acct_plan_billing_dates_m: {
+        client_no: p('aria.client_no'),
+        auth_key: p('aria.auth_key'),
+        acct_no: payload.ariaAcct,
+        master_plan_instance_no: payload.ariaMPI,
+        action_directive: payload.actionDirective,
+        adjustment_date: payload.adjustmentDate
+      }
+    }
+  }
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="Flow: #[flow.name] Action=Log Payload=#[message.payloadAs(java.lang.String)]" level="INFO" category="mrll.project.aria" doc:name="Log Adjust Billing Plan Request Payload"/>
+        <until-successful maxRetries="${aria.http.max.retries}" millisBetweenRetries="${aria.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" doc:name="Until Successful" synchronous="true">
+            <http:request config-ref="ariaRequestConfiguration" path="${aria.path}" method="POST" doc:name="HTTP">
+                <http:request-builder>
+                    <http:header headerName="SOAPAction" value="&quot;adjust_acct_plan_billing_dates_m&quot;"/>
+                </http:request-builder>
+            </http:request>
+        </until-successful>
+        <catch-exception-strategy doc:name="ariaCatch_Exception_Strategy">
+            <logger message="Flow: #[flow.name] Action=LogException ExceptionSummary=#[exception.getSummaryMessage()]" level="ERROR" category="mrll.project.aria" doc:name="Log Exception Summary"/>
+        </catch-exception-strategy>
+    </flow>
+    <flow name="putAriaAccountPlanStatus" processingStrategy="synchronous">
+        <vm:inbound-endpoint exchange-pattern="request-response" path="vmPutAriaAccountPlanStatus" connector-ref="VM_IN_MEMORY" doc:name="Put Aria Account Plan Status"/>
+        <logger message="Flow: #[flow.name] Action=Started" level="INFO" category="mrll.project.aria" doc:name="Log Flow Start"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace aria urn:client:api:wsdl:document/literal_wrapped:vers:11.0:aria_complete_m_api
+%namespace soap http://schemas.xmlsoap.org/soap/envelope/
+%function statusCode (value) 1 when value == "Active" otherwise -3 when value == "Closed" otherwise -1 when value == "Suspended" otherwise -99
+// Bug fix 07/20/17
+---
+{
+  soap#Envelope: {
+    soap#Header: {},
+    soap#Body: {
+      aria#update_acct_plan_status_m: {
+        client_no: p('aria.client_no'),
+        auth_key: p('aria.auth_key'),
+        acct_no: payload.ariaAcct,
+
+        client_plan_instance_id: payload.ariaMPI,
+        status_cd: statusCode(payload.theProject.projectStatus),
+        force_bill_date_reset: 1
+      }
+    }
+  }
+}
+]]></dw:set-payload>
+        </dw:transform-message>
+        <logger message="Flow: #[flow.name] Action=LogRequestPayload Payload=#[message.payloadAs(java.lang.String)]" level="INFO" category="mrll.project.aria" doc:name="Log Request Payload"/>
+        <until-successful maxRetries="${aria.http.max.retries}" millisBetweenRetries="${aria.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" doc:name="Until Successful" synchronous="true">
+            <http:request config-ref="ariaRequestConfiguration" path="${aria.path}" method="POST" doc:name="UpdateAccountPlanStatus">
+                <http:request-builder>
+                    <http:header headerName="SOAPAction" value="&quot;update_acct_plan_status_m&quot;"/>
+                </http:request-builder>
+            </http:request>
+        </until-successful>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="Flow: #[flow.name] Action=LogExceptionSummary ExceptionSummary=#[exception.getSummaryMessage()]" level="INFO" doc:name="Log Exception Summary"/>
+        </catch-exception-strategy>
+    </flow>
+
+    <sub-flow name="ariaUpdateAcctPlanStatus">
+        <logger message="flow=ariaUpdateAcctPlanStatus action=started projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload resource="classpath:aria-update-plan-status.dwl"/>
+        </dw:transform-message>
+
+        <logger message="system=Aria method=UpdateAcctPlanStatus action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <logger message="system=Aria method=UpdateAcctPlanStatus action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <until-successful maxRetries="${aria.http.max.retries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful" millisBetweenRetries="${aria.http.milliSecondsBetweenRetries}">
+            <http:request config-ref="ariaRequestConfiguration" path="${aria.path}" method="POST" doc:name="UpdateAcctPlanStatus">
+                <http:request-builder>
+                    <http:header headerName="SOAPAction" value="&quot;update_acct_plan_status_m&quot;"/>
+                </http:request-builder>
+            </http:request>
+        </until-successful>
+
+        <logger message="system=Aria method=UpdateAcctPlanStatus action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <logger message="system=Aria method=UpdateAcctPlanStatus action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <dw:transform-message doc:name="Parse for entitlements and state">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+%namespace env http://schemas.xmlsoap.org/soap/envelope/
+%namespace aria urn:client:api:wsdl:document/literal_wrapped:vers:11.0:aria_complete_m_api
+%var responseElement = payload.env#Envelope.env#Body.aria#update_acct_plan_status_mResponseElement
+---
+{
+  errorMessage: responseElement.error_msg,
+  errorCode: responseElement.error_code
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <logger message="flow=ariaUpdateAcctPlanStatus action=completed projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+    </sub-flow>
+
+    <flow name="ariaDeactivateWorkflow">
+
+        <logger message="system=Aria method=DeactivateWorkflow action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] fromAriaValue=#[flowVars.fromAriaValues] toAriaValues=#[flowVars.toAriaValues] flags=#[flowVars.ariaWorkflowFlags]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+<logger message="flow=ariaDeactivateWorkflow moveToCompany=#[flowVars.moveToCompany] fromAriaValues=#[flowVars.fromAriaValues] toAriaValues=#[flowVars.toAriaValues]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="setPayloadBeforeUntilSuccess"/>
+        <until-successful maxRetries="${aria.http.max.retries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful" millisBetweenRetries="${aria.http.milliSecondsBetweenRetries}">
+            <http:request config-ref="ariaWorkflowRequestConfiguration" path="${aria.workflow.path}" method="GET" doc:name="Call Aria Workflow">
+                <http:request-builder>
+                    <http:query-param paramName="FlowId" value="4a90951a-7ca7-41d4-ab2e-984e2e3ed52d"/>
+                    <http:query-param paramName="Action" value="api"/>
+                    <http:query-param paramName="sessionid" value="NS-f41237b5-1a51-11e7-8db7-00155d142d0e"/>
+                    <http:query-param paramName="outputtype" value="XML"/>
+
+                    <http:query-param paramName="FromAcctNo" value="#[flowVars.fromAriaValues.ariaAcct]"/>
+                    <http:query-param paramName="FromMPI" value="#[flowVars.fromAriaValues.ariaMPI]"/>
+
+                    <http:query-param paramName="ToAcctNo" value="#[flowVars.toAriaValues.ariaAcct]"/>
+                    <http:query-param paramName="ToMPI" value="#[flowVars.toAriaValues.ariaMPI]"/>
+
+                    <http:query-param paramName="Void" value="#[flowVars.ariaWorkflowFlags.void]"/>
+                    <http:query-param paramName="Terminate" value="#[flowVars.ariaWorkflowFlags.terminate]"/>
+                    <http:query-param paramName="No_Copy" value="#[flowVars.ariaWorkflowFlags.noCopy]"/>
+                    <http:query-param paramName="Retro" value="#[flowVars.ariaWorkflowFlags.retro]"/>
+                </http:request-builder>
+            </http:request>
+        </until-successful>
+
+        <logger message="system=Aria method=DeactivateWorkflow action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" category="com.merrillcorp.q2c" level="INFO" doc:name="Logger"/>
+
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="flow=ariaDeactivateWorkflow Exception Summary: #[exception.getSummaryMessage()]" level="ERROR" category="com.merrillcorp.q2c" doc:name="Log Exception Summary"/>
+        </catch-exception-strategy>
+    </flow>
+     <flow name="prorationWorkflow" processingStrategy="synchronous">
+        <logger message="Working Payload #[payload]" level="INFO" category="prorationWorkflow" doc:name="Logger"/>
+        <until-successful maxRetries="${aria.http.max.retries}" doc:name="Until Successful" synchronous="true" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" millisBetweenRetries="${aria.http.milliSecondsBetweenRetries}">
+            <http:request config-ref="ariaWorkflowRequestConfiguration" path="${aria.workflow.path}" method="GET" doc:name="HTTP">
+                <http:request-builder>
+                    <http:query-param paramName="FlowId" value="daa2ca3e-b411-4a74-941e-6be7356ebef5"/>
+                    <http:query-param paramName="Action" value="api"/>
+                    <http:query-param paramName="sessionid" value="NS-37779c9c-406e-11e5-88c9-00155d0f0b06"/>
+                    <http:query-param paramName="outputtype" value="XML"/>
+                    <http:query-param paramName="AccountNo" value="#[flowVars.ariavalues.ariaAcct]"/>
+                    <http:query-param paramName="PlanIntanceNumber" value="#[flowVars.ariavalues.ariaMPI]"/>
+                    <http:query-param paramName="ProrationDate" value="#[server.dateTime.format(&quot;yyyy-MM-dd&quot;)]"/>
+                </http:request-builder>
+            </http:request>
+        </until-successful>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="#[exception.getSummaryMessage()]" level="ERROR" category="prorationWorkflow" doc:name="Logger"/>
+        </catch-exception-strategy>
+    </flow>
+</mule>

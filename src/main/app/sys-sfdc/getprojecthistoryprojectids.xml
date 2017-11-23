@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:objectstore="http://www.mulesoft.org/schema/mule/objectstore"
+	xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+	xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/objectstore http://www.mulesoft.org/schema/mule/objectstore/current/mule-objectstore.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+
+    <flow name="GET_PROJECT_HISTORY_PROJECT_IDS" processingStrategy="synchronous">
+        <vm:inbound-endpoint exchange-pattern="request-response" path="VM_GET_PROJECT_HISTORY_PROJECT_IDS" connector-ref="VM_IN_MEMORY" doc:name="VM_GET_PROJECT_HISTORY_PROJECT_IDS"/>
+        <objectstore:contains config-ref="Project_Company_History_Object_Store" key="lastMaxProjectHistoryId" doc:name="ObjectStore"/>
+        <choice doc:name="Choice">
+            <when expression="#[payload == true]">
+                <objectstore:retrieve config-ref="Project_Company_History_Object_Store" key="lastMaxProjectHistoryId" doc:name="Retrieve Last Max Project History Id"/>
+                <logger message="***Last Max Project History Id: #[message.payloadAs(java.lang.String)]" level="INFO" category="getProjectHistoryProjectIds" doc:name="[DEBUG]Log Last Max Project History Id"/>
+                <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select      max(id)  id    , DataSiteOne_Project__c  from DataSiteOne_Project_History__c   where    id  &gt; '#[payload]'   group by   DataSiteOne_Project__c " doc:name="Salesforce"/>
+            </when>
+            <otherwise>
+                <logger message="Using YESTERDAY instead of MAX PROJECT HISTORY ID" level="WARN" category="GET_PROJECT_HISTORY_PROJECT_IDS" doc:name="[WARN]USING DATE INSTEAD OF MAX ID"/>
+                <sfdc:query config-ref="Salesforce__Basic_Authentication" query="select max(id) id, DataSiteOne_Project__c  from DataSiteOne_Project_History__c where createdDate &gt; YESTERDAY group by DataSiteOne_Project__c  " doc:name="Salesforce"/>
+            </otherwise>
+        </choice>
+        <json:object-to-json-transformer mimeType="application/json" doc:name="Object to JSON"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <choice doc:name="Choice">
+            <when expression="#[payload.size() &gt; 0]">
+                <logger message="***Get Project History Size &gt; 0: #[message.payloadAs(java.lang.String)]" level="INFO" category="getProjectHistoryProjectIds" doc:name="[DEBUG]Log Message"/>
+                <expression-component doc:name="Set SFDC Response"><![CDATA[flowVars.sfdcResponse=payload;]]></expression-component>
+                <dw:transform-message doc:name="Transform Message">
+                    <dw:input-payload/>
+                    <dw:set-variable variableName="maxProjectHistoryId"><![CDATA[%dw 1.0
+%output application/java
+---
+(payload orderBy $.id)[-1..0][0]
+]]></dw:set-variable>
+                </dw:transform-message>
+                <objectstore:store config-ref="Project_Company_History_Object_Store" key="lastMaxProjectHistoryId" value-ref="#[flowVars.maxProjectHistoryId.id]" overwrite="true" doc:name="Store Maxd Project History Id"/>
+                <set-payload value="#[flowVars.sfdcResponse]" doc:name="Set Payload to SFDC Response"/>
+            </when>
+            <otherwise>
+                <set-payload value="[]" mimeType="application/json" doc:name="Set Payload"/>
+            </otherwise>
+        </choice>
+
+        <json:object-to-json-transformer mimeType="application/json" doc:name="Object to JSON"/>
+
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="#[exception.getSummaryMessage()]" level="ERROR" category="GET_PROJECT_HISTORY_PROJECT_IDS" doc:name="Log Exception"/>
+            <set-payload doc:name="Set Payload" value="Unable to retrieve Project history"/>
+            <set-property doc:name="400" propertyName="http.status" value="#[400]"/>
+        </catch-exception-strategy>
+    </flow>
+</mule>

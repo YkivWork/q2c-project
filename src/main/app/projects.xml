@@ -1,0 +1,432 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting"
+	xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    <flow name="startProjectProcess" processingStrategy="synchronous">
+        <logger message="flow=#[flow.name] action=started payload=#[payload]" level="INFO" category="START_PROJECT_PROCESS" doc:name="Log Initial Payload"/>
+        <dw:transform-message doc:name="Transform to Java Object">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <set-variable variableName="theProject" value="#[payload]" doc:name="Set theProject flow Variable"/>
+        <set-variable variableName="projectId" value="#[payload.projectSfdcId]" doc:name="Set projectId flow Variable"/>
+        <set-variable variableName="invocationId" value="#[java.util.UUID.randomUUID().toString().replace('-', '')]" doc:name="Set invocationId flow Variable"/>
+        <dw:transform-message doc:name="Transform Message">
+            
+            <dw:set-variable variableName="total"><![CDATA[%dw 1.0
+%output application/java
+---
+using (splitrec = payload.companies)
+{
+  splitTotal: sum splitrec.billingSplit
+}]]></dw:set-variable>
+        </dw:transform-message>
+
+
+        <choice doc:name="Choice">
+            <when expression="#[(payload['companies'].size() &lt; 1) || (flowVars.total.splitTotal != 100)]">
+                <logger message="0 companies or Billing Split Total &lt;&gt; 100 is not supported!  Project: #[payload['name']] projectId=#[flowVars.projectId]" level="ERROR" category="com.merrillcorp.q2c" doc:name="Logger"/>
+            </when>
+            <otherwise>
+                <flow-ref name="projectProcessFlow" doc:name="projectProcessFlow"/>
+            </otherwise>
+        </choice>
+        <logger message="flow=#[flow.name] action=completed payload=#[payload]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="#[exception.getSummaryMessage()] projectId=#[flowVars.projectId]" level="ERROR" category="START_PROJECT_PROCESS" doc:name="Log Exception Summary"/>
+        </catch-exception-strategy>
+    </flow>
+
+
+    <flow name="projectProcessFlow" processingStrategy="synchronous">
+        <logger message="flow=#[flow.name] action=started projectId=#[flowVars.projectId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <enricher target="variable:upsertSfdcProjResponse" doc:name="Message Enricher">
+            <flow-ref name="upsertPROJ:SF_PROJ" doc:name="upsertPROJ:SF_PROJ"/>
+        </enricher>
+        <set-variable variableName="initialUpsertSfdcProjResponse" value="#[flowVars.upsertSfdcProjResponse]" doc:name="Variable"/>
+
+        <foreach collection="flowVars.theProject.companies" doc:name="For Each">
+            <set-variable variableName="theCompany" value="#[payload]" doc:name="Set theCompany"/>
+            <set-variable variableName="subTransactionId" value="#[payload['sfdcId']]" doc:name="Variable"/>
+
+            <flow-ref name="createPROJMdrXRefs" doc:name="createPROJMdrXRefs"/>
+            <flow-ref name="processEachCompanyFlow" doc:name="processEachCompanyFlow"/>
+        </foreach>
+
+        <flow-ref name="reconcileBillingCompany" doc:name="reconcileBillingCompany"/>
+
+        <!--
+        Throughout the full process different things make calls that change MDR (mainly during creates).
+         - Aria
+         - Oracle
+         - DSO
+
+        TODO We need to capture those things in an in-memory list so we can refer to it on later steps that need it.
+        Once that is done, then we won't need the following call (it is already done above.
+        -->
+        <enricher target="variable:upsertSfdcProjResponse" doc:name="Message Enricher">
+            <flow-ref name="getXRefForSFDCProjectFlow" doc:name="getXRefForSFDCProjectFlow"/>
+        </enricher>
+
+        <flow-ref name="persistInDSOFlow" doc:name="persistInDSOFlow"/>
+
+        <flow-ref name="persistInOracleFlow" doc:name="persistInOracleFlow"/>
+
+        <logger message="flow=#[flow.name] action=completed projectId=#[flowVars.projectId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <exception-strategy ref="global-exception-strategy" doc:name="Reference Exception Strategy" />
+    </flow>
+
+    <sub-flow name="processEachCompanyFlow">
+        <logger message="flow=processEachCompanyFlow action=started projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <enricher target="variable:upsertOrgAddrResponse" doc:name="Message Enricher">
+            <flow-ref name="upsertORGADDR:SF_BILLADDR" doc:name="upsertORGADDR:SF_BILLADDR"/>
+        </enricher>
+
+        <!--
+         TODO Does it matter when we need to call these?
+         Refer to Karl's visio doc and make sure we line up (primarily for support alignment)
+        -->
+        <flow-ref name="createORGADDR:ORA_SITE" doc:name="createORGADDR:ORA_SITE"/>
+        <flow-ref name="createORGADDR:ORA_ACCT" doc:name="createORGADDR:ORA_ACCT"/>
+        <flow-ref name="createORGADDR:SF_BILLCO" doc:name="createORGADDR:SF_BILLCO"/>
+
+        <enricher target="variable:upsertOrgResponse" doc:name="Message Enricher">
+            <flow-ref name="upsertORG:SF_BILLCO" doc:name="upsertORG:SF_BILLCO"/>
+        </enricher>
+
+        <flow-ref name="createORG:ORA_ACCT" doc:name="createORG:ORA_ACCT"/>
+
+        <enricher target="variable:ariaValues" doc:name="Message Enricher">
+            <flow-ref name="matchAriaValues" doc:name="matchAriaValues"/>
+        </enricher>
+
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.?ariaValues.?ariaAcct != empty]">
+                <enricher target="variable:ariaAcctDetails" doc:name="Message Enricher">
+                    <flow-ref name="getAriaAcctDetailsFlow" doc:name="getAriaAcctDetailsFlow"/>
+                </enricher>
+
+                <choice doc:name="Choice">
+                    <when expression="#[flowVars.ariaValues.ariaMPI != empty]">
+                        <logger message="action=updatingAccountPlan projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+                        <flow-ref name="reconcileBillingAddress" doc:name="Flow Reference"/>
+
+                        <enricher target="variable:ariaResponse" doc:name="Message Enricher">
+                            <flow-ref name="updateInAriaFlow" doc:name="updateInAriaFlow"/>
+                        </enricher>
+                        <flow-ref name="updateAriaContactFlow" doc:name="updateAriaContactFlow"/>
+                    </when>
+                    <otherwise>
+                        <logger message="action=creatingNewPlan projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+                        <enricher target="variable:ariaResponse" doc:name="Message Enricher">
+                            <flow-ref name="createNewPlanInAriaFlow" doc:name="createNewPlanInAriaFlow"/>
+                        </enricher>
+                        <flow-ref name="updateAriaCreationFieldInSfdcFlow" doc:name="updateAriaCreationFieldInSfdcFlow"/>
+                        <flow-ref name="addAriaMpiToSfProjectFlow" doc:name="addAriaMpiToSfProjectFlow"/>
+                        <flow-ref name="addAriaAcctToSfProjXRefFlow" doc:name="addAriaAcctToSfProjXRefFlow"/>
+                        <flow-ref name="addAriaAcctToSfBillCoXRefFlow" doc:name="addAriaAcctToSfBillCoXRefFlow"/>
+                    </otherwise>
+                </choice>
+            </when>
+            <otherwise>
+                <logger message="system=aria action=creatingNewAccount projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+                <enricher target="variable:ariaResponse" doc:name="Message Enricher">
+                    <flow-ref name="createInAriaFlow" doc:name="createInAriaFlow"/>
+                </enricher>
+
+                <dw:transform-message doc:name="Parse Aria Response">
+                    <dw:set-variable variableName="ariaValues"><![CDATA[%dw 1.0
+%output application/java
+---
+{
+  ariaAcct: flowVars.ariaResponse.accountNumber,
+  ariaMPI: flowVars.ariaResponse.planInstanceNumber
+}]]></dw:set-variable>
+                </dw:transform-message>
+
+                <enricher target="variable:ariaAcctDetails" doc:name="Message Enricher">
+                    <flow-ref name="getAriaAcctDetailsFlow" doc:name="getAriaAcctDetailsFlow"/>
+                </enricher>
+
+                <flow-ref name="updateAriaCreationFieldInSfdcFlow" doc:name="updateAriaCreationFieldInSfdcFlow"/>
+                <flow-ref name="addAriaMpiToSfProjectFlow" doc:name="addAriaMpiToSfProjectFlow"/>
+                <flow-ref name="addAriaAcctToSfProjXRefFlow" doc:name="addAriaAcctToSfProjXRefFlow"/>
+                <flow-ref name="addAriaAcctToSfBillCoXRefFlow" doc:name="addAriaAcctToSfBillCoXRefFlow"/>
+            </otherwise>
+        </choice>
+
+        <logger message="flow=processEachCompanyFlow action=completed projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+    </sub-flow>
+
+    <sub-flow name="reconcileBillingCompany">
+        <logger message="flow=reconcileBillingCompany action=started projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] ----------------&gt; #[payload]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <dw:transform-message doc:name="SF_BILLCO_Check">
+            <dw:set-variable variableName="sfBillCoInactivate"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.initialUpsertSfdcProjResponse filter $.IdentifierTypeKey == 'SF_BILLCO' and $.ENDDATE == null map ((iter, position) ->
+  using (found = flowVars.theProject.companies[?( $.billingCompany.sfdcId == iter.IdentifierValue )])
+{
+  markInactive: found == null,
+  sfdcId: iter.IdentifierValue,
+  vat: iter.Qualifier1Value,
+  startDate: iter.StartDate
+} default []) filter $.markInactive]]></dw:set-variable>
+        </dw:transform-message>
+        <logger message="system=Aria action=results method=DetermineInactivate payload=#[flowVars.sfBillCoInactivate]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <dw:transform-message doc:name="Transform">
+            <dw:set-variable variableName="performAriaWorkflowCall"><![CDATA[%dw 1.0
+%output application/java
+---
+( sizeOf flowVars.sfBillCoInactivate default []) == 1
+]]></dw:set-variable>
+        </dw:transform-message>
+
+        <choice doc:name="Choice">
+            <when expression="flowVars.performAriaWorkflowCall">
+                <set-variable variableName="sfBillCoInactivate" value="#[flowVars.sfBillCoInactivate[0]]" doc:name="Variable"/>
+
+                <enricher target="variable:fromAriaValues" doc:name="Message Enricher">
+                    <flow-ref name="findFromAriaValues" doc:name="findFromAriaValues"/>
+                </enricher>
+
+                <enricher doc:name="Message Enricher">
+                    <flow-ref name="findToAriaValues" doc:name="Flow Reference"/>
+                    <enrich target="variable:toAriaValues" source="#[payload]" />
+                    <enrich target="variable:moveToCompany" source="#[flowVars.moveToCompany]" />
+                </enricher>
+
+                <enricher target="variable:deactivateResults" doc:name="Message Enricher">
+                    <flow-ref name="deactivateBillingCompanyFlow" doc:name="Flow Reference"/>
+                </enricher>
+            </when>
+            <otherwise>
+                <logger message="We found no SF_BILLCO to deactivate projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+
+        <logger message="flow=reconcileBillingCompany action=completed projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+    </sub-flow>
+
+    <sub-flow name="findFromAriaValues">
+        <set-variable variableName="theCompany" value="#[dw('billingCompany:{sfdcId:flowVars.sfBillCoInactivate.sfdcId, vatRegistration:flowVars.sfBillCoInactivate.vat}')]" doc:name="Variable"/>
+
+        <enricher target="variable:upsertOrgResponse" doc:name="Message Enricher">
+            <flow-ref name="upsertORG:SF_BILLCO" doc:name="upsertORG:SF_BILLCO"/>
+        </enricher>
+
+        <flow-ref name="matchAriaValues" doc:name="matchAriaValues"/>
+
+    </sub-flow>
+
+    <sub-flow name="findToAriaValues">
+        <enricher target="variable:upsertSfdcProjResponse" doc:name="Message Enricher">
+            <flow-ref name="upsertPROJ:SF_PROJ" doc:name="upsertPROJ:SF_PROJ"/>
+        </enricher>
+
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.theProject.companies map ((iter, position) ->
+  using (found = flowVars.upsertSfdcProjResponse[?(
+   iter.billingCompany.sfdcId == $.IdentifierValue
+  )])
+{
+  validMoveTo: found != null,
+  sfdcId: iter.billingCompany.sfdcId,
+  vat: iter.billingCompany.vatRegistration,
+  retroChange: iter.retroChange,
+  companyToMoveTowards: iter
+} default []) filter $.validMoveTo
+]]></dw:set-payload>
+        </dw:transform-message>
+        
+        <logger message="system=Aria action=results method=DetermineInactivateReplacement payload=#[payload]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <set-payload value="#[payload[0]]" doc:name="Set Payload"/>
+        <set-variable variableName="moveToCompany" value="#[payload['companyToMoveTowards']]" doc:name="Variable"/>
+
+        <set-variable variableName="theCompany" value="#[dw('billingCompany:{sfdcId: payload.sfdcId, vatRegistration: payload.vat}')]" doc:name="Variable"/>
+        <enricher target="variable:upsertOrgResponse" doc:name="Message Enricher">
+            <flow-ref name="upsertORG:SF_BILLCO" doc:name="upsertORG:SF_BILLCO"/>
+        </enricher>
+
+        <flow-ref name="matchAriaValues" doc:name="matchAriaValues"/>
+
+        <logger message="flow=findToAriaValues action=completed payload=#[payload] moveToCompany=#[flowVars.moveToCompany] theCompany=#[flowVars.theCompany] upsertOrgResponse=#[flowVars.upsertOrgResponse]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+    </sub-flow>
+
+    <sub-flow name="deactivateBillingCompanyFlow">
+
+        <set-variable variableName="ariaResponse" value="#[dw('{accountNumber: flowVars.fromAriaValues.ariaAcct, planInstanceNumber: flowVars.fromAriaValues.ariaMPI}')]" doc:name="Variable"/>
+
+        <dw:transform-message doc:name="SF_BILLADDR_Check">
+            <dw:set-variable variableName="theCompany"><![CDATA[%dw 1.0
+%output application/java
+
+%var billingAddress = (flowVars.initialUpsertSfdcProjResponse filter $.IdentifierTypeKey == 'SF_BILLADDR' and $.ENDDATE == null)[0]
+%var oraSite = (flowVars.initialUpsertSfdcProjResponse filter $.IdentifierTypeKey == 'ORA_Site' and $.ENDDATE == null)[0]
+%var oraAcct = (flowVars.initialUpsertSfdcProjResponse filter $.IdentifierTypeKey == 'ORA_Acct' and $.ENDDATE == null)[0]
+---
+{
+  billingCompany: {
+    sfdcId: flowVars.sfBillCoInactivate.sfdcId,
+    vatRegistration: flowVars.sfBillCoInactivate.vat,
+    oracleAccountId: oraAcct.IdentifierValue
+  },
+  billingAddress: {
+    sfdcId: billingAddress.IdentifierValue,
+    oracleSiteId: oraSite.IdentifierValue
+  }
+}]]></dw:set-variable>
+        </dw:transform-message>
+
+        <logger message="The company to deactivate: #[flowVars.theCompany]" level="INFO" doc:name="Logger"/>
+
+        <set-variable variableName="setMdrStartDate" value="#[flowVars.sfBillCoInactivate.startDate]" doc:name="Variable"/>
+        <set-variable variableName="setMdrEndDate" value="#[true]" doc:name="Variable"/>
+
+        <scatter-gather doc:name="Scatter-Gather">
+            <flow-ref name="addBillCoToSfProjXRefFlow" doc:name="addBillCoToSfProjXRefFlow"/>
+            <flow-ref name="addBillAddrToSfProjXRefFlow" doc:name="addBillAddrToSfProjXRefFlow"/>
+            <flow-ref name="addOraAcctToSfProjXRefFlow" doc:name="addOraAcctToSfProjXRefFlow"/>
+            <flow-ref name="addOraSiteToSfProjXRefFlow" doc:name="addOraSiteToSfProjXRefFlow"/>
+        </scatter-gather>
+
+        <set-variable variableName="ariaWorkflowFlags" value="#[ ['noCopy': false, 'retro': flowVars.moveToCompany.retroChange, 'terminate': true, 'void': flowVars.moveToCompany.retroChange] ]" doc:name="Variable"/>
+        <flow-ref name="ariaDeactivateWorkflow" doc:name="ariaDeactivateWorkflow"/>
+
+        <flow-ref name="addAriaAcctToSfProjXRefFlow" doc:name="Flow Reference"/>
+        <flow-ref name="addAriaMpiToSfProjectFlow" doc:name="Flow Reference"/>
+
+    </sub-flow>
+
+    <flow name="reconcileBillingAddress">
+        <logger message="flow=reconcileBillingAddress action=started projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <dw:transform-message doc:name="Transform">
+            <dw:set-variable variableName="sfBillAddrInactivate"><![CDATA[%dw 1.0
+%output application/java
+---
+log('QTC-513 initialUpsertSfdcProjResponse', flowVars.initialUpsertSfdcProjResponse) filter $.IdentifierTypeKey == 'SF_BILLADDR' and $.EndDate == null map ((iter, position) ->
+  using (found = log('QTC-513 billingAddr.sfdcId ', flowVars.theCompany.billingAddress.sfdcId) == log('QTC-513 iter.IdentifierValue', iter.IdentifierValue))
+{
+  markInactive: log('QTC-513 found', not found),
+  sfdcId: iter.IdentifierValue,
+  operUnit: iter.Qualifier1Value,
+  startDate: iter.StartDate
+} default []) filter $.markInactive]]></dw:set-variable>
+        </dw:transform-message>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="oraSiteInactivate"><![CDATA[%dw 1.0
+%output application/java
+---
+log('QTC-513 initialUpsertSfdcProjResponse', flowVars.initialUpsertSfdcProjResponse) filter $.IdentifierTypeKey == 'ORA_Site' and $.EndDate == null map ((iter, position) ->
+  using (found = log('QTC-513 billingAddr.oracleSiteId ', flowVars.theCompany.billingAddress.oracleSiteId) == log('QTC-513 iter.IdentifierValue', iter.IdentifierValue))
+{
+  markInactive: log('QTC-513 found', not found),
+  oraSiteId: iter.IdentifierValue,
+  operUnit: iter.Qualifier1Value,
+  startDate: iter.StartDate
+} default []) filter $.markInactive]]></dw:set-variable>
+        </dw:transform-message>
+
+        <logger message="system=Aria action=results method=DetermineBillAddrInactivate payload=#[flowVars.sfBillAddrInactivate] ariaAcct=#[flowVars.ariaValues]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <choice doc:name="Choice">
+            <when expression="flowVars.sfBillAddrInactivate.size() == 1">
+                <set-variable variableName="sfBillAddrInactivate" value="#[flowVars.sfBillAddrInactivate[0]]" doc:name="Variable"/>
+
+                <set-variable variableName="setMdrStartDate" value="#[flowVars.sfBillAddrInactivate.startDate]" doc:name="Variable"/>
+                <set-variable variableName="setMdrEndDate" value="#[true]" doc:name="Variable"/>
+                <set-variable variableName="oraSiteInactivate" value="#[flowVars.oraSiteInactivate[0]]" doc:name="Variable"/>
+
+                <flow-ref name="addBillAddrToSfProjXRefFlow" doc:name="addBillAddrToSfProjXRefFlow"/>
+
+                <flow-ref name="addOraSiteToSfProjXRefFlow" doc:name="addOraSiteToSfProjXRefFlow"/>
+            </when>
+            <otherwise>
+                <logger message="We found no SF_BILLADDR to deactivate projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+
+        <dw:transform-message doc:name="Transform to Java Object">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+
+%var responseElement = read(flowVars.ariaAcctDetails, 'application/xml').Envelope.Body.get_acct_details_all_mResponseElement
+%var masterPlan = responseElement.*master_plans_info[?( $.client_master_plan_instance_id == flowVars.ariaValues.ariaMPI )][0]
+%var billingGroupNo = masterPlan.billing_group_no
+
+%var billingGroup = responseElement.*billing_groups_info[?( $.billing_group_no == billingGroupNo )][0]
+
+%var company = flowVars.theCompany
+
+// The true seems redundant, but when performAriaWorkflowCall is null then the full expressions converts to false
+%function checkit() log('QTC-513 performAriaWorkflowCall?', flowVars.performAriaWorkflowCall == true) or
+(
+  log('QTC-513 RetroChange?', company.retroChange) and
+  (
+    log('QTC-513 FirstName Different?', billingGroup.stmt_first_name != company.firstName) or
+    log('QTC-513 LastName Different?', billingGroup.stmt_last_name != company.lastName) or
+    log('QTC-513 Phone Different?', billingGroup.stmt_phone != company.phone) or
+    log('QTC-513 Email Different?', billingGroup.stmt_email != company.email)
+  )
+)
+---
+performWorkflowCall: checkit()]]></dw:set-payload>
+        </dw:transform-message>
+
+        <choice doc:name="Choice">
+            <when expression="payload.performWorkflowCall">
+                <logger message="QTC-513 action=BillingAddressWorkflowCalculation results=Needed projectId=#[flowVars.projectId] companyId=#[flowVars.theCompany.sfdcId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+                <set-variable variableName="fromAriaValues" value="#[flowVars.ariaValues]" doc:name="Variable"/>
+                <set-variable variableName="toAriaValues" value="#[flowVars.ariaValues]" doc:name="Variable"/>
+                <set-variable variableName="moveToCompany" value="#[flowVars.theCompany]" doc:name="Variable"/>
+
+                <set-variable variableName="ariaWorkflowFlags" value="#[ ['noCopy': false, 'retro': flowVars.theCompany.retroChange, 'terminate': false, 'void': true] ]" doc:name="Variable"/>
+
+                <flow-ref name="ariaDeactivateWorkflow" doc:name="ariaDeactivateWorkflow"/>
+            </when>
+            <otherwise>
+                <logger message="QTC-513 action=BillingAddressWorkflowCalculation results=NotNeeded projectId=#[flowVars.projectId] companyId=#[flowVars.theCompany.sfdcId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+                <flow-ref name="prorationWorkflow" doc:name="prorationWorkflow"/>
+            </otherwise>
+        </choice>
+
+        <logger message="flow=reconcileBillingCompany action=completed projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="flow=reconcileBillingAddress #[exception.getSummaryMessage()] projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="ERROR" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        </catch-exception-strategy>
+    </flow>
+
+</mule>

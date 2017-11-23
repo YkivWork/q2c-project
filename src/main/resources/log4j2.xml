@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Configuration>
+	<Appenders>
+		<RollingFile name="file1"
+			fileName="${sys:mule.home}${sys:file.separator}logs${sys:file.separator}q2c-project.log"
+			filePattern="${sys:mule.home}${sys:file.separator}logs${sys:file.separator}q2c-project-%i.log">
+			<PatternLayout pattern="%d [%t] %-5p %c - %m%n" />
+			<SizeBasedTriggeringPolicy size="10 MB" />
+			<DefaultRolloverStrategy max="10" />
+		</RollingFile>
+		<RollingFile name="file2"
+			fileName="${sys:mule.home}${sys:file.separator}logs${sys:file.separator}q2c-project-http-retry.log"
+			filePattern="${sys:mule.home}${sys:file.separator}logs${sys:file.separator}q2c-project-http-retry-%i.log">
+			<PatternLayout pattern="[%d] %m%n" />
+			<SizeBasedTriggeringPolicy size="10 MB" />
+			<DefaultRolloverStrategy max="10" />
+		</RollingFile>
+	</Appenders>
+
+
+	<Loggers>
+		<!-- CXF is used heavily by Mule for web services -->
+		<AsyncLogger name="org.apache.cxf" level="WARN">
+			<AppenderRef ref="file1" />
+		</AsyncLogger>
+
+		<!-- Apache Commons tend to make a lot of noise which can clutter the log -->
+		<AsyncLogger name="org.apache" level="WARN">
+			<AppenderRef ref="file1" />
+		</AsyncLogger>
+
+		<!-- Reduce startup noise -->
+		<AsyncLogger name="org.springframework.beans.factory"
+			level="WARN">
+			<AppenderRef ref="file1" />
+		</AsyncLogger>
+
+		<!-- Mule classes -->
+		<AsyncLogger name="org.mule" level="INFO">
+			<AppenderRef ref="file1" />
+		</AsyncLogger>
+		<AsyncLogger name="com.mulesoft" level="INFO">
+			<AppenderRef ref="file1" />
+		</AsyncLogger>
+
+		<!-- Reduce DM verbosity -->
+		<AsyncLogger name="org.jetel" level="WARN">
+			<AppenderRef ref="file1" />
+		</AsyncLogger>
+		<AsyncLogger name="Tracking" level="WARN">
+			<AppenderRef ref="file1" />
+		</AsyncLogger>
+
+
+		<AsyncLogger name="org.glassfish.grizzly.utils" level="INFO"/>
+        <AsyncLogger name="org.mule.module.http.internal" level="INFO"/>
+        <AsyncLogger name="com.ning.http.client.providers.grizzly" level="INFO"/>
+
+		<AsyncLogger name="com.merrillcorp.q2c" level="DEBUG">
+			<AppenderRef ref="file1" />
+		</AsyncLogger>
+		<AsyncLogger name="org.mule.module.http.internal.HttpMessageLogger" level="INFO">
+			<AppenderRef ref="file1" />
+		</AsyncLogger>
+
+		<AsyncLogger name="com.merrillcorp.q2c.retry" level="ERROR">
+			<AppenderRef ref="file2" />
+		</AsyncLogger>
+
+	</Loggers>
+</Configuration>

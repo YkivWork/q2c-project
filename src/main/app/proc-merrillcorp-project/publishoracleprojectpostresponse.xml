@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:microsoftservicebus="http://www.mulesoft.org/schema/mule/microsoftservicebus" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/microsoftservicebus http://www.mulesoft.org/schema/mule/microsoftservicebus/current/mule-microsoftservicebus.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd">
+    <flow name="PUBLISH_ORACLE_PROJECT_POST_RESPONSE" processingStrategy="synchronous">
+        <vm:inbound-endpoint exchange-pattern="request-response" path="VM_PUBLISH_ORACLE_PROJECT_POST_RESPONSE" connector-ref="VM_IN_MEMORY" doc:name="VM_PUBLISH_ORACLE_PROJECT_POST_RESPONSE"/>
+        <logger message="Initial Payload: #[payload]" level="DEBUG" category="PUBLISH_ORACLE_PROJECT_POST_RESPONSE" doc:name="[DEBUG]Log Initial Payload"/>
+        <flow-ref name="SERVICE_BUS_PUBLISH_ORACLE_PROJECT_POST_RESPONSE" doc:name="SERVICE_BUS_PUBLISH_ORACLE_PROJECT_POST_RESPONSE"/>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="#[exception.getSummaryMessage()]" level="ERROR" category="PUBLISH_ORACLE_PROJECT_POST_RESPONSE" doc:name="Log Exception Summary"/>
+        </catch-exception-strategy>
+    </flow>
+    <flow name="SERVICE_BUS_PUBLISH_ORACLE_PROJECT_POST_RESPONSE" processingStrategy="synchronous">
+        <microsoftservicebus:queue-send config-ref="Microsoft_Service_Bus__Azure_Service_Bus" destinationQueue="oracleprojectpostresponse" doc:name="Microsoft Service Bus"/>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="#[exception.getSummaryMessage()]" level="ERROR" category="SERVICE_BUS_PUBLISH_ORACLE_PROJECT_POST_RESPONSE" doc:name="Log Exception Summary"/>
+        </catch-exception-strategy>
+    </flow>
+</mule>

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+    <flow name="POST_PROJECT_IN_ORACLE" processingStrategy="synchronous">
+        <vm:inbound-endpoint exchange-pattern="request-response" path="POST_PROJECT_IN_ORACLe" connector-ref="VM_IN_MEMORY" doc:name="VM_POST_PROJECT_IN_ORACLE"/>
+        <logger message="Initial Payload: #[payload]" level="DEBUG" category="POST_PROJECT_IN_ORACLE" doc:name="[DEBUG]Log Initial Payload"/>
+        <vm:outbound-endpoint exchange-pattern="request-response" path="VM_GET_ORACLE_AUTH" connector-ref="VM_IN_MEMORY" doc:name="VM_GET_ORACLE_AUTH"/>
+        <dw:transform-message doc:name="Transform Oracle Auth Response to Java Object">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <expression-component doc:name="Initialize Oracle Auth Response Variables"><![CDATA[flowVars.oracleAuth=payload;]]></expression-component>
+        <until-successful maxRetries="${oracle.http.max.retries}" millisBetweenRetries="${oracle.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful">
+            <http:request config-ref="oracleRequestConfiguration" path="${oracle.project.path}" method="POST" doc:name="HTTP">
+                <http:request-builder>
+                    <http:header headerName="Cookie" value="#[flowVars.oracleAuth.tokenName + '=' + flowVars.oracleAuth.accessToken]"/>
+                </http:request-builder>
+            </http:request>
+        </until-successful>
+        <dw:transform-message doc:name="Parse Project Post Result">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+  oracle_project_number : payload.OutputParameters.P_RESULTS.PROJECT_NUMBER,
+  status : payload.OutputParameters.P_RESULTS.STATUS,
+  message : payload.OutputParameters.P_RESULTS.MESSAGES.MESSAGES_ITEM
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="#[exception.getSummaryMessage()]" level="ERROR" category="POST_PROJECT_IN_ORACLE" doc:name="Log Exception"/>
+        </catch-exception-strategy>
+    </flow>
+</mule>

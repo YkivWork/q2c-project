@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:core="http://www.mulesoft.org/schema/mule/core" xmlns:mock="http://www.mulesoft.org/schema/mule/mock" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/mock http://www.mulesoft.org/schema/mule/mock/current/mule-mock.xsd">
+    <munit:config name="munit" doc:name="MUnit configuration"/>
+    <spring:beans>
+        <spring:import resource="classpath:projects.xml"/>
+        <spring:import resource="classpath:aria.xml"/>
+        <spring:import resource="classpath:dso.xml"/>
+        <spring:import resource="classpath:dso-auth.xml"/>
+        <spring:import resource="classpath:sfdc.xml"/>
+        <spring:import resource="classpath:sfdc-lookups.xml"/>
+        <spring:import resource="classpath:error-handling.xml"/>
+        <spring:import resource="classpath:oracle.xml"/>
+        <spring:import resource="classpath:oracle-auth.xml"/>
+        <spring:import resource="classpath:oracle-lookups.xml"/>
+        <spring:import resource="classpath:mdr-xrefs.xml"/>
+        <spring:import resource="classpath:mdr-upserts.xml"/>
+        <spring:import resource="classpath:globals.xml"/>
+    </spring:beans>
+
+    <munit:test name="projectProcessFlowCallsEachSystem_WhenAnUpdateOccurs" description="Test">
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock reconcileBillingCompany">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('reconcileBillingCompany')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[samePayload()]"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock MDR Upsert PROJ">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('upsertPROJ:SF_PROJ')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[samePayload()]"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock MDR Upsert">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('upsertPROJMdrXRefs')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[samePayload()]"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:flow" doc:name="Mock MDR Upsert">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="getXRefForSFDCProjectFlow"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[samePayload()]"/>
+        </mock:when>
+
+
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock DSO">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('persistInDSOFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[samePayload()]"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock Oracle">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('persistInOracleFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[samePayload()]"/>
+        </mock:when>
+
+        <munit:set payload="#[getResource('sfdc-query-response.json').asString()]" mimeType="application/json" doc:name="Set Message"/>
+
+        <set-payload value="#[dw(payload, 'application/java')]" doc:name="Set Payload"/>
+        <set-variable variableName="theProject" value="#[ ['projectSfdcId': 'some ref id'] ]" doc:name="Variable"/>
+        <flow-ref name="projectProcessFlow" doc:name="projectProcessFlow"/>
+        <mock:verify-call messageProcessor="mule:sub-flow" times="1" doc:name="Verify DSO Called Once">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('persistInDSOFlow')]"/>
+            </mock:with-attributes>
+        </mock:verify-call>
+        <mock:verify-call messageProcessor="mule:sub-flow" times="1" doc:name="Verify Oracle Called Once">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('persistInOracleFlow')]"/>
+            </mock:with-attributes>
+        </mock:verify-call>
+    </munit:test>
+
+    <munit:test name="reconcileMDRAndSFDC_WhenADatasiteOneCompanyIsMarkedAsInactive" description="Test" ignore="true">
+        <mock:when messageProcessor="http:request" doc:name="Mock MDR HTTP Call">
+            <mock:with-attributes>
+                <mock:with-attribute name="config-ref" whereValue="mdrSystemRequestConfiguration"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[]"/>
+        </mock:when>
+        <mock:spy messageProcessor="mule:sub-flow" doc:name="Spy on MDR System">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('addBillCoToSfProjXRefFlow')]"/>
+            </mock:with-attributes>
+            <mock:assertions-before-call>
+                <munit:assert-on-equals message="SF_BILLCO is invalid" expectedValue="a3ic0000000jnwuAAA" actualValue="#[flowVars.theCompany.billingCompany.sfdcId]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="markInactive is invalid" expectedValue="#[true]" actualValue="#[flowVars.markInactive]" doc:name="Assert Equals"/>
+            </mock:assertions-before-call>
+        </mock:spy>
+
+        <set-variable variableName="theProject" value="#[getResource('sfdc-query-response.json').asString()]" mimeType="application/json" doc:name="Variable"/>
+        <set-variable variableName="upsertSfdcProjResponse" value="#[getResource('project-tests/inactive-dso-company/mdr-upsert-proj.json').asString()]" mimeType="application/json" doc:name="Variable"/>
+
+        <munit:set payload="#[]" doc:name="Set Message"/>
+
+        <flow-ref name="reconcileBillingCompany" doc:name="reconcileBillingCompany"/>
+
+        <mock:verify-call messageProcessor="mule:sub-flow" times="1" doc:name="Verify MDR Called Once">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('addBillCoToSfProjXRefFlow')]"/>
+            </mock:with-attributes>
+        </mock:verify-call>
+    </munit:test>
+
+    <munit:test name="reconcileMDRAndSFDC_WhenNewCompanyIsAdded" description="Test" ignore="true">
+        <mock:when messageProcessor="http:request" doc:name="Mock MDR HTTP Call">
+            <mock:with-attributes>
+                <mock:with-attribute name="config-ref" whereValue="mdrSystemRequestConfiguration"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[]"/>
+        </mock:when>
+        <mock:spy messageProcessor="mule:sub-flow" doc:name="Spy on MDR System">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('addBillCoToSfProjXRefFlow')]"/>
+            </mock:with-attributes>
+            <mock:assertions-before-call>
+                <munit:assert-on-equals message="SF_BILLCO is invalid" expectedValue="a3ic0000000jnwuAAA" actualValue="#[flowVars.theCompany.billingCompany.sfdcId]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="markInactive is invalid" expectedValue="#[true]" actualValue="#[flowVars.markInactive]" doc:name="Assert Equals"/>
+            </mock:assertions-before-call>
+        </mock:spy>
+
+        <set-variable variableName="theProject" value="#[getResource('sfdc-query-response.json').asString()]" mimeType="application/json" doc:name="Variable"/>
+        <set-variable variableName="upsertSfdcProjResponse" value="#[getResource('project-tests/inactive-dso-company/mdr-upsert-proj.json').asString()]" mimeType="application/json" doc:name="Variable"/>
+        <set-variable variableName="initialUpsertSfdcProjResponse" value="#[upsertSfdcProjResponse]" mimeType="application/json" doc:name="Variable"/>
+
+        <munit:set payload="#[]" doc:name="Set Message"/>
+
+        <flow-ref name="reconcileBillingCompany" doc:name="reconcileBillingCompany"/>
+
+        <mock:verify-call messageProcessor="mule:sub-flow" times="1" doc:name="Verify MDR Called Once">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('addBillCoToSfProjXRefFlow')]"/>
+            </mock:with-attributes>
+        </mock:verify-call>
+    </munit:test>
+</mule>

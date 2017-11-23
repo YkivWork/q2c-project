@@ -1,0 +1,43 @@
+{
+  "OutputParameters" : {
+    "@xmlns:xsi" : "http://www.w3.org/2001/XMLSchema-instance",
+    "@xmlns" : "http://xmlns.oracle.com/apps/pa/rest/xxsp_mapping_svc/get_proj_org_mapping/",
+    "X_PROJECT_ORGS" : {
+      "X_PROJECT_ORGS_ITEM" : [ {
+        "BUSINESS_UNIT" : "DATASITE",
+        "REVENUE_SITE" : "CHI",
+        "COUNTRY_OF_ISSUER" : "UM",
+        "PROJ_ORG_ID" : "763",
+        "PROJ_ORG_NAME" : "FDS-CHICAGO 311 WACKER"
+      }, {
+        "BUSINESS_UNIT" : "DATASITE",
+        "REVENUE_SITE" : "STP",
+        "COUNTRY_OF_ISSUER" : "US",
+        "PROJ_ORG_ID" : "76",
+        "PROJ_ORG_NAME" : "FDS-CHICAGO 311 WACKER"
+      }, {
+        "BUSINESS_UNIT" : "DATASITE",
+        "REVENUE_SITE" : "CHI",
+        "COUNTRY_OF_ISSUER" : "UY",
+        "PROJ_ORG_ID" : "168",
+        "PROJ_ORG_NAME" : "FDS-GLOBAL"
+      }, {
+        "BUSINESS_UNIT" : "DATASITE",
+        "REVENUE_SITE" : "CHI",
+        "COUNTRY_OF_ISSUER" : "UZ",
+        "PROJ_ORG_ID" : "168",
+        "PROJ_ORG_NAME" : "FDS-GLOBAL"
+      }, {
+        "BUSINESS_UNIT" : "DATASITE",
+        "REVENUE_SITE" : "WLA",
+        "COUNTRY_OF_ISSUER" : "AL",
+        "PROJ_ORG_ID" : "168",
+        "PROJ_ORG_NAME" : "FDS-GLOBAL"
+      } ]
+    },
+    "X_RESULTS" : {
+      "STATUS" : "S",
+      "MESSAGE" : "5440 Rows Returned."
+    }
+  }
+}

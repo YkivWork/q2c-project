@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd">
+    <flow name="processProjectSuspendedYesterday" processingStrategy="synchronous">
+        <vm:inbound-endpoint exchange-pattern="request-response" path="vmProcessProjectSuspendedYesterday" connector-ref="VM_IN_MEMORY" doc:name="Process Project Suspended Yesterday"/>
+        <logger message="Flow: #[flow.name] Action=Started" level="INFO" category="mrll.project.process" doc:name="Log Flow Start"/>
+        <dw:transform-message doc:name="Transform to Java Object">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <set-variable variableName="theProject" value="#[payload]" doc:name="theProject Flow Variable"/>
+        <logger message="Flow: #[flow.name] Project=#[message.payloadAs(java.lang.String)]" level="INFO" category="mrll.project.process" doc:name="Log the Project Payload"/>
+        <foreach collection="payload.companies" doc:name="For Each">
+            <set-variable variableName="theCompany" value="#[payload]" doc:name="Set theCompany Flow Variable"/>
+            <enricher target="variable:upsertOrgResponse" doc:name="Message Enricher">
+                <flow-ref name="getXRefForOrgFlow" doc:name="getXRefForOrgFlow"/>
+            </enricher>
+            <enricher target="variable:ariaValues" doc:name="Message Enricher">
+                <flow-ref name="matchAriaValues" doc:name="matchAriaValues"/>
+            </enricher>
+            <enricher target="variable:ariaAccountDetails" doc:name="Message Enricher (Aria Account Details)">
+                <flow-ref name="getAriaAcctDetailsFlow" doc:name="getAriaAcctDetailsFlow"/>
+            </enricher>
+            <choice doc:name="Choice">
+                <when expression="-#[flowVars.ariaAccountDetails.master_plans_info.next_bill_date - server.dateTime &lt;= 27]">
+                    <logger message="Flow: #[flow.name] Action=Log Message=next_bill_date - today &lt;= 27" level="INFO" category="mrll.project.process" doc:name="Log Date &lt;= 27"/>
+                    <dw:transform-message doc:name="Transform Message">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	ariaAcct: flowVars.ariaValues.ariaAcct,
+	ariaMPI: flowVars.ariaValues.ariaMPI,
+	actionDirective: 3,
+	theProject: flowVars.theProject,
+	theCompany: flowVars.theCompany,
+	adjustmentDate: server.dateTime
+}]]></dw:set-payload>
+                    </dw:transform-message>
+                </when>
+                <when expression="-#[flowVars.ariaAccountDetails.master_plans_info.next_bill_date - server.dateTime &gt; 27]">
+                    <logger message="Flow: #[flow.name] Action=Log Message=#[flowVars.ariaAccountDetails.master_plans_info.next_bill_date] - #[server.dateTime] &gt; 27" level="INFO" category="mrll.project.process" doc:name="Log Date &gt; 27"/>
+                    <set-variable variableName="dayDifference" value="#[server.dateTime - flowVars.ariaAccountDetails.master_plans_info.next_bill_date ]" doc:name="Variable"/>
+                    <dw:transform-message doc:name="Transform Message">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	ariaAcct: flowVars.ariaValues.ariaAcct,
+	ariaMPI: flowVars.ariaValues.ariaMPI,
+	actionDirective: 2,
+	theProject: flowVars.theProject,
+	theCompany: flowVars.theCompany,
+	adjustmentDate: server.dateTime	
+}]]></dw:set-payload>
+                    </dw:transform-message>
+                    <flow-ref name="putAriaAdjustPlanBillingDates" doc:name="putAriaAdjustPlanBillingDates"/>
+                    <dw:transform-message doc:name="Transform Message">
+                        <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+%var d1 = flowVars.ariaAccountDetails.master_plans_info.next_bill_date as :date
+%var d2 = server.dateTime as :date
+%var p1 = (d1 - d2)
+
+%var d3 = (flowVars.ariaAccountDetails.master_plans_info.next_bill_date ++ " 00:00:00.000") as :localdatetime {format: "yyyy-MM-dd HH:mm:ss.SSS"}
+%var d4 = (server.dateTime ++ " 00:00:00.000") as :localdatetime {format: "yyyy-MM-dd HH:mm:ss.SSS"}
+%var diff = (d4 - d3).seconds / 86400
+---
+{
+	ariaAcct: flowVars.ariaValues.ariaAcct,
+	ariaMPI: flowVars.ariaValues.ariaMPI,
+	actionDirective: 2,
+	theProject: flowVars.theProject,
+	theCompany: flowVars.theCompany,
+	adjustmentDate: server.dateTime	
+}]]></dw:set-payload>
+                    </dw:transform-message>
+                </when>
+                <otherwise>
+                    <logger message="Flow: #[flow.name] Message=This shouldn't have happened." level="WARN" category="mrll.project.subscribe" doc:name="Log Fall through"/>
+
+                </otherwise>
+            </choice>
+            <flow-ref name="putAriaAdjustPlanBillingDates" doc:name="putAriaAdjustPlanBillingDates"/>
+        </foreach>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="Flow: #[flow.name] ExceptionSummary=#[exception.getSummaryMessage()]" level="ERROR" category="mrll.project.process" doc:name="Log Exception Summary"/>
+        </catch-exception-strategy>
+    </flow>
+    <flow name="processProjectSuspendedLast2Days" processingStrategy="synchronous">
+        <vm:inbound-endpoint exchange-pattern="request-response" path="vmProcessProjectSuspendedLast2Days" connector-ref="VM_IN_MEMORY" doc:name="Process Project Suspended Last 2 Days"/>
+        <logger message="Flow: #[flow.name] Action=Started Payload=#[message.payloadAs(java.lang.String)]" level="INFO" category="mrll.project.process" doc:name="Log Flow Start"/>
+        <dw:transform-message doc:name="Transform to Java Object">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <set-variable variableName="theProject" value="#[payload]" doc:name="Variable"/>
+        <logger message="Flow: #[flow.name] Payload=#[message.payloadAs(java.lang.String)]" level="INFO" category="mrll.project.process" doc:name="Log Project Payload"/>
+        <foreach collection="payload.companies" doc:name="For Each">
+            <set-variable variableName="theCompany" value="#[payload.]" doc:name="Set theCompany Flow Variable"/>
+            <enricher target="variable:upsertOrgResponse" doc:name="Message Enricher">
+                <flow-ref name="getXRefForOrgFlow" doc:name="getXRefForOrgFlow"/>
+            </enricher>
+            <enricher target="variable:ariaValues" doc:name="Message Enricher">
+                <flow-ref name="matchAriaValues" doc:name="matchAriaValues"/>
+            </enricher>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+	ariaAcct: flowVars.ariaValues.ariaAcct,
+	ariaMPI: flowVars.ariaValues.ariaMPI,
+	theProject: flowVars.theProject,
+	theCompany: flowVars.theCompany
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <flow-ref name="putAriaAccountPlanStatus" doc:name="putAriaAccountPlanStatus"/>
+        </foreach>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="Flow: #[flow.name] Action=LogExceptionSummary ExceptionSummary=#[exception.getSummaryMessage()]" level="ERROR" category="mrll.project.process" doc:name="Log Exception Summary"/>
+        </catch-exception-strategy>
+    </flow>
+    <flow name="processSFDCProject" processingStrategy="synchronous">
+        <vm:inbound-endpoint exchange-pattern="request-response" path="vmProcessSFDCProject" connector-ref="VM_IN_MEMORY" doc:name="Process SFDC Project"/>
+        <logger message="***Process SFDC Project Initial Payload: #[message.payloadAs(java.lang.String)]" level="INFO" category="processSFDCProject" doc:name="Log Initial Payload"/>
+        <dw:transform-message doc:name="Transform to Java Object">
+            <dw:set-variable variableName="projectId"><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-variable>
+        </dw:transform-message>
+
+        <vm:outbound-endpoint exchange-pattern="request-response" path="VM_GET_PROJECT_BY_PROJECT_ID" connector-ref="VM_IN_MEMORY" doc:name="VM_GET_PROJECT_BY_PROJECT_ID"/>
+        <dw:transform-message doc:name="Transform to Java Object">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <choice doc:name="Choice">
+            <when expression="#[payload == empty]">
+                <logger level="WARN" doc:name="Log Empty Payload" category="PROCESS_MERRILL_PROJECT" message="Empty Result for Project Id:  #[flowVars.projectId.ProjectId]"/>
+            </when>
+            <otherwise>
+                <json:object-to-json-transformer mimeType="application/json" doc:name="Object to JSON"/>
+                <logger message="***Project Before Mapping: #[message.payloadAs(java.lang.String)]" level="INFO" category="processSFDCProject" doc:name="[DEBUG]Log Project Before Mapping"/>
+                <vm:outbound-endpoint exchange-pattern="request-response" path="VM_MAP_SFDC_PROJECT" connector-ref="VM_IN_MEMORY" doc:name="vmMapSFDCProject"/>
+                <logger message="***Project After Mapping: #[message.payloadAs(java.lang.String)]" level="INFO" category="processSFDCProject" doc:name="[DEBUG]Project After Mapping"/>
+                <vm:outbound-endpoint exchange-pattern="request-response" path="VM_PUBLISH_SFDC_PROJECT" connector-ref="VM_IN_MEMORY" doc:name="VM_PUBLISH_SFDC_PROJECT"/>
+            </otherwise>
+        </choice>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="Exception Summary: #[exception.getSummaryMessage()]" level="ERROR" category="processSFDCProject" doc:name="Log Exception"/>
+        </catch-exception-strategy>
+    </flow>
+</mule>

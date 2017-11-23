@@ -1,0 +1,23 @@
+{
+  "OutputParameters" : {
+    "@xmlns:xsi" : "http://www.w3.org/2001/XMLSchema-instance",
+    "@xmlns" : "http://xmlns.oracle.com/apps/pa/rest/xxsp_mapping_svc/get_invoice_mapping/",
+    "X_INV_MAP" : {
+      "X_INV_MAP_ITEM" : [{
+        "CURRENCY_CODE" : "USD",
+        "LEGAL_ENTITY" : "010",
+        "OPERATING_UNIT_ID" : "21",
+        "OPERATING_UNIT_NAME" : "US_OU-MERRILL CORPORATION",
+        "HEADER_LEFT" : "<null>",
+        "HEADER_RIGHT" : "<null>",
+        "FOOTER_LEFT" : "Remit Check Payment to ...",
+        "FOOTER_RIGHT" : "Remit ACH/Fed Wire Payment to...",
+        "TERMS_VERBIAGE" : "Terms: Due upon receipt"
+      }]
+    },
+    "X_RESULTS" : {
+      "STATUS" : "S",
+      "MESSAGE" : "1 Rows Returned."
+    }
+  }
+}

@@ -1,0 +1,653 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  	xmlns:mock="http://www.mulesoft.org/schema/mule/mock"
+	xmlns:munit="http://www.mulesoft.org/schema/mule/munit"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/mock http://www.mulesoft.org/schema/mule/mock/current/mule-mock.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd">
+    <munit:config name="munit" doc:name="MUnit configuration"/>
+    <spring:beans>
+        <spring:import resource="classpath:globals.xml"/>
+        <spring:import resource="classpath:aria-lookups.xml"/>
+        <spring:import resource="classpath:sfdc-lookups.xml"/>
+        <spring:import resource="classpath:oracle-lookups.xml"/>
+        <spring:import resource="classpath:oracle-auth.xml"/>
+    </spring:beans>
+    <munit:test name="transformFormatsUpdateRowCorrectly" description="MUnit Test">
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock Auth">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('getOracleAuthFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="{ }" mimeType="application/json">
+                <mock:invocation-properties>
+                    <mock:invocation-property key="oracleAuth" value="#[ ['tokenName': '', 'accessToken': ''] ]" mimeType="application/java"/>
+                </mock:invocation-properties>
+            </mock:then-return>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${aria.admintools.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('aria-entitlements-response.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${oracle.invoiceMapping.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('oracle-get-invoice-mapping.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+
+
+        <set-payload value="#[getResource('sfdc-query-response.json').asString()]" mimeType="application/json" doc:name="Variable" />
+        <json:json-to-object-transformer returnClass="java.util.HashMap" mimeType="application/java" doc:name="JSON to Object"/>
+        <set-variable value="#[payload]" variableName="theProject" mimeType="application/java" doc:name="Variable" />
+        <expression-component doc:name="Set EffectiveDate to Null">payload.billingEffectiveDate = '2017-06-06';</expression-component>
+
+        <set-variable value="#[payload['companies'][0]]" variableName="theCompany" mimeType="application/java" doc:name="Variable" />
+        <set-variable variableName="ariaValues" value="#[ ['ariaAcct': '1234', 'ariaMPI': 'zxcv'] ]" mimeType="application/java" doc:name="Variable"/>
+        <set-variable variableName="salesReps" value="#[ [ ['name': 'John Doe', 'isPrimary': false, 'employeeNumber': 'abc123', 'splitPercentage': '20.0'], ['name': 'Jane Doe', 'isPrimary': true, 'employeeNumber': 'qwer567', 'splitPercentage': '80.0'] ] ]" mimeType="application/java" doc:name="Variable"/>
+
+        <set-variable variableName="ariaAcctDetails" value="#[getResource('dataweave-update-project/existing-project.xml').asString()]" doc:name="Variable"/>
+
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload resource="classpath:update-account.dwl"/>
+        </dw:transform-message>
+
+        <set-variable variableName="planMultiNode" value="#[xpath3('/soap:Envelope/soap:Body/aria:update_acct_plan_multi_m', payload, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.planMultiNode != empty]" message="planMultiNode should not be empty" doc:name="Assert True"/>
+        <munit:assert-on-equals expectedValue="true" actualValue="#[xpath3('do_write', flowVars.planMultiNode)]" message="do_write is invalid" doc:name="Assert Equals"/>
+        <munit:assert-on-equals expectedValue="1234" actualValue="#[xpath3('acct_no', flowVars.planMultiNode)]" message="acct_no is invalid" doc:name="Assert Equals"/>
+
+        <set-variable variableName="planUpdatesNode" value="#[xpath3('plan_updates/plan_updates_row', planMultiNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.planUpdatesNode != empty]" message="planUpdatesNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="masterPlanUpdatesNode" value="#[xpath3('plan_updates/plan_updates_row[string-length(existing_plan_instance_no/text()) > 0]', planMultiNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.masterPlanUpdatesNode != empty]" message="masterPlanUpdatesNode should not be empty" doc:name="Assert True"/>
+
+        <munit:assert-on-equals message="plan_directive is invalid" expectedValue="3" actualValue="#[xpath3('plan_directive', flowVars.masterPlanUpdatesNode)]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="existing_plan_instance_no is invalid" expectedValue="zxcv" actualValue="#[xpath3('existing_plan_instance_no', flowVars.masterPlanUpdatesNode)]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="po_num is invalid" expectedValue="order-number" actualValue="#[xpath3('po_num', flowVars.masterPlanUpdatesNode)]" doc:name="Assert Equals"/>
+
+
+        <munit:assert-true condition="#[xpath3('plan_status_cd', flowVars.masterPlanUpdatesNode, 'NODE') == empty]" message="plan_status_cd is invalid" doc:name="Assert Equals"/>
+
+        <set-variable variableName="planInstanceFieldNode" value="#[xpath3('plan_instance_field_update', flowVars.masterPlanUpdatesNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.planInstanceFieldNode != empty]" message="planInstanceFieldsNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="activeDateNode" value="#[xpath3('plan_instance_field_update_row[plan_instance_field_name = &quot;ACTIVE_DATE&quot;]', flowVars.planInstanceFieldNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-on-equals message="ACTIVE_DATE value is invalid" expectedValue="2017-03-06" actualValue="#[xpath3('plan_instance_field_value', flowVars.activeDateNode)]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="ACTIVE_DATE directive is invalid" expectedValue="2" actualValue="#[xpath3('plan_instance_field_directive', flowVars.activeDateNode)]" doc:name="Assert Equals"/>
+
+        <set-variable variableName="activeLabelNode" value="#[xpath3('plan_instance_field_update_row[plan_instance_field_name = &quot;ACTIVE_LABEL&quot;]', flowVars.planInstanceFieldNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-on-equals message="ACTIVE_LABEL value is invalid" expectedValue="Launched" actualValue="#[xpath3('plan_instance_field_value', flowVars.activeLabelNode)]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="ACTIVE_LABEL directive is invalid" expectedValue="2" actualValue="#[xpath3('plan_instance_field_directive', flowVars.activeLabelNode)]" doc:name="Assert Equals"/>
+
+        <set-variable variableName="closeDateNode" value="#[xpath3('plan_instance_field_update_row[plan_instance_field_name = &quot;CLOSE_DATE&quot;]', flowVars.planInstanceFieldNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true message="closeDateNode should be empty" condition="#[flowVars.closeDateNode == empty]" doc:name="Assert True"/>
+<!--
+        <munit:assert-on-equals message="CLOSE_DATE value is invalid" expectedValue="Launched" actualValue="#[xpath3('plan_instance_field_value', flowVars.closeDateNode)]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="CLOSE_DATE directive is invalid" expectedValue="2" actualValue="#[xpath3('plan_instance_field_directive', flowVars.closeDateNode)]" doc:name="Assert Equals"/>
+-->
+
+
+        <set-variable variableName="mediaNode" value="#[xpath3('plan_instance_field_update_row[plan_instance_field_name = &quot;MEDIA_INCLUDED&quot;]', flowVars.planInstanceFieldNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true message="mediaNode should not be empty" condition="#[flowVars.mediaNode != empty]" doc:name="Assert True"/>
+        <munit:assert-on-equals message="MEDIA_INCLUDED value is invalid" expectedValue="3.0" actualValue="#[xpath3('plan_instance_field_value', flowVars.mediaNode)]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="MEDIA_INCLUDED directive is invalid" expectedValue="2" actualValue="#[xpath3('plan_instance_field_directive', flowVars.mediaNode)]" doc:name="Assert Equals"/>
+
+        <set-variable variableName="continuationRateNode" value="#[xpath3('plan_instance_field_update_row[plan_instance_field_name = &quot;CONTINUATION_RATE&quot;]', flowVars.planInstanceFieldNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true message="continuationRateNode should not be empty" condition="#[flowVars.continuationRateNode != empty]" doc:name="Assert True"/>
+        <munit:assert-on-equals message="CONTINUATION_RATE value is invalid" expectedValue="0.01" actualValue="#[xpath3('plan_instance_field_value', flowVars.continuationRateNode)]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="CONTINUATION_RATE directive is invalid" expectedValue="2" actualValue="#[xpath3('plan_instance_field_directive', flowVars.continuationRateNode)]" doc:name="Assert Equals"/>
+
+        <set-variable variableName="contractCustomerNode" value="#[xpath3('plan_instance_field_update_row[plan_instance_field_name = &quot;CONTRACT_CUSTOMER&quot;]', flowVars.planInstanceFieldNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true message="contractCustomerNode should not be empty" condition="#[flowVars.contractCustomerNode != empty]" doc:name="Assert True"/>
+        <munit:assert-on-equals message="CONTRACT_CUSTOMER value is invalid" expectedValue="3M" actualValue="#[xpath3('plan_instance_field_value', flowVars.contractCustomerNode)]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="CONTRACT_CUSTOMER directive is invalid" expectedValue="2" actualValue="#[xpath3('plan_instance_field_directive', flowVars.contractCustomerNode)]" doc:name="Assert Equals"/>
+
+        <set-variable variableName="contractCustomerAddressNode" value="#[xpath3('plan_instance_field_update_row[plan_instance_field_name = &quot;CONTRACT_CUSTOMER_ADDRESS&quot;]', flowVars.planInstanceFieldNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true message="contractCustomerAddressNode should not be empty" condition="#[flowVars.contractCustomerAddressNode != empty]" doc:name="Assert True"/>
+        <munit:assert-on-equals message="CONTRACT_CUSTOMER_ADDRESS value is invalid" expectedValue="1 Main St City MN 55555" actualValue="#[xpath3('plan_instance_field_value', flowVars.contractCustomerAddressNode)]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="CONTRACT_CUSTOMER_ADDRESS directive is invalid" expectedValue="2" actualValue="#[xpath3('plan_instance_field_directive', flowVars.contractCustomerAddressNode)]" doc:name="Assert Equals"/>
+
+        <set-variable variableName="contractCustomerContactNode" value="#[xpath3('plan_instance_field_update_row[plan_instance_field_name = &quot;CONTRACT_CUSTOMER_CONTACT&quot;]', flowVars.planInstanceFieldNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true message="contractCustomerContactNode should not be empty" condition="#[flowVars.contractCustomerContactNode != empty]" doc:name="Assert True"/>
+        <munit:assert-on-equals message="CONTRACT_CUSTOMER_CONTACT value is invalid" expectedValue="John Doe" actualValue="#[xpath3('plan_instance_field_value', flowVars.contractCustomerContactNode)]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="CONTRACT_CUSTOMER_CONTACT directive is invalid" expectedValue="2" actualValue="#[xpath3('plan_instance_field_directive', flowVars.contractCustomerContactNode)]" doc:name="Assert Equals"/>
+
+        <set-variable variableName="contractTermNode" value="#[xpath3('plan_instance_field_update_row[plan_instance_field_name = &quot;CONTRACT_TERM&quot;]', flowVars.planInstanceFieldNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true message="contractTermNode should not be empty" condition="#[flowVars.contractTermNode != empty]" doc:name="Assert True"/>
+        <munit:assert-on-equals message="CONTRACT_TERM value is invalid" expectedValue="5" actualValue="#[xpath3('plan_instance_field_value', flowVars.contractTermNode)]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="CONTRACT_TERM directive is invalid" expectedValue="2" actualValue="#[xpath3('plan_instance_field_directive', flowVars.contractTermNode)]" doc:name="Assert Equals"/>
+
+        <set-variable variableName="currentEntitlementNode" value="#[xpath3('plan_instance_field_update_row[plan_instance_field_name = &quot;CURRENT_ENTITLEMENT&quot;]', flowVars.planInstanceFieldNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true message="currentEntitlementNode should not be empty" condition="#[flowVars.currentEntitlementNode != empty]" doc:name="Assert True"/>
+        <munit:assert-on-equals message="CURRENT_ENTITLEMENT value is invalid" expectedValue="VDR; SecureExcelViewer; QA" actualValue="#[xpath3('plan_instance_field_value', flowVars.currentEntitlementNode)]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="CURRENT_ENTITLEMENT directive is invalid" expectedValue="2" actualValue="#[xpath3('plan_instance_field_directive', flowVars.currentEntitlementNode)]" doc:name="Assert Equals"/>
+
+        <set-variable variableName="effectiveDateNode" value="#[xpath3('plan_instance_field_update_row[plan_instance_field_name = &quot;EFFECTIVE_DATE&quot;]', flowVars.planInstanceFieldNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true message="effectiveDateNode should not be empty" condition="#[flowVars.effectiveDateNode != empty]" doc:name="Assert True"/>
+        <munit:assert-on-equals message="EFFECTIVE_DATE value is invalid" expectedValue="2017-06-06" actualValue="#[xpath3('plan_instance_field_value', flowVars.effectiveDateNode)]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="EFFECTIVE_DATE directive is invalid" expectedValue="2" actualValue="#[xpath3('plan_instance_field_directive', flowVars.effectiveDateNode)]" doc:name="Assert Equals"/>
+
+        <set-variable variableName="hibernateDateNode" value="#[xpath3('plan_instance_field_update_row[plan_instance_field_name = &quot;HIBERNATE_DATE&quot;]', flowVars.planInstanceFieldNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true message="hibernateDateNode should be empty" condition="#[flowVars.hibernateDateNode == empty]" doc:name="Assert True"/>
+
+        <set-variable variableName="hibernationRateNode" value="#[xpath3('plan_instance_field_update_row[plan_instance_field_name = &quot;HIBERNATION_RATE&quot;]', flowVars.planInstanceFieldNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true message="hibernationRateNode should not be empty" condition="#[flowVars.hibernationRateNode != empty]" doc:name="Assert True"/>
+        <munit:assert-on-equals message="HIBERNATION_RATE value is invalid" expectedValue="0.0" actualValue="#[xpath3('plan_instance_field_value', flowVars.hibernationRateNode)]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="HIBERNATION_RATE directive is invalid" expectedValue="2" actualValue="#[xpath3('plan_instance_field_directive', flowVars.hibernationRateNode)]" doc:name="Assert Equals"/>
+
+        <set-variable variableName="oracleSiteIdNode" value="#[xpath3('plan_instance_field_update_row[plan_instance_field_name = &quot;BILL_TO_ADDRESS_IDS&quot;]', flowVars.planInstanceFieldNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true message="oracleSiteIdNode should not be empty" condition="#[flowVars.oracleSiteIdNode != empty]" doc:name="Assert True"/>
+        <munit:assert-on-equals message="BILL_TO_ADDRESS_IDS value is invalid" expectedValue="32123.0" actualValue="#[xpath3('plan_instance_field_value', flowVars.oracleSiteIdNode)]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="BILL_TO_ADDRESS_IDS directive is invalid" expectedValue="2" actualValue="#[xpath3('plan_instance_field_directive', flowVars.oracleSiteIdNode)]" doc:name="Assert Equals"/>
+
+        <set-variable variableName="salesRepNode" value="#[xpath3('plan_instance_field_update_row[plan_instance_field_name = &quot;SALESREP_SPLIT_AMOUNT&quot;]', flowVars.planInstanceFieldNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true message="salesRepNode should not be empty" condition="#[flowVars.salesRepNode != empty]" doc:name="Assert True"/>
+        <munit:assert-on-equals message="SALES_REP value is invalid" expectedValue="John Doe|abc123|false|20.0;Jane Doe|qwer567|true|80.0" actualValue="#[xpath3('plan_instance_field_value', flowVars.salesRepNode)]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="SALES_REP directive is invalid" expectedValue="2" actualValue="#[xpath3('plan_instance_field_directive', flowVars.salesRepNode)]" doc:name="Assert Equals"/>
+
+        <set-variable variableName="primaryRepIdNode" value="#[xpath3('plan_instance_field_update_row[plan_instance_field_name = &quot;PRIMARY_REP_ID&quot;]', flowVars.planInstanceFieldNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true message="primaryRepIdNode should not be empty" condition="#[flowVars.primaryRepIdNode != empty]" doc:name="Assert True"/>
+        <munit:assert-on-equals message="PRIMARY_REP_ID value is invalid" expectedValue="qwer567" actualValue="#[xpath3('plan_instance_field_value', flowVars.primaryRepIdNode)]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="PRIMARY_REP_ID directive is invalid" expectedValue="2" actualValue="#[xpath3('plan_instance_field_directive', flowVars.primaryRepIdNode)]" doc:name="Assert Equals"/>
+
+        <set-variable variableName="primayRepNameNode" value="#[xpath3('plan_instance_field_update_row[plan_instance_field_name = &quot;PRIMARY_REP_NAME&quot;]', flowVars.planInstanceFieldNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true message="primayRepNameNode should not be empty" condition="#[flowVars.primayRepNameNode != empty]" doc:name="Assert True"/>
+        <munit:assert-on-equals message="PRIMARY_REP_NAME value is invalid" expectedValue="Jane Doe" actualValue="#[xpath3('plan_instance_field_value', flowVars.primayRepNameNode)]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="PRIMARY_REP_NAME directive is invalid" expectedValue="2" actualValue="#[xpath3('plan_instance_field_directive', flowVars.primayRepNameNode)]" doc:name="Assert Equals"/>
+
+<!--
+        <munit:assert-on-equals expectedValue="1" actualValue="#[xpath3('billing_group/billing_group_row/stmt_contact_idx', flowVars.acctRowNode)]" message="stmt_contact_idx is invalid" doc:name="Assert Equals"/>
+
+        <munit:assert-on-equals expectedValue="010" actualValue="#[xpath3('client_legal_entity_id', flowVars.acctRowNode)]" message="client_legal_entity_id is invalid" doc:name="Assert Equals"/>
+        <munit:assert-on-equals expectedValue="2017-02-11" actualValue="#[xpath3('retroactive_start_date', flowVars.acctRowNode)]" message="retroactive_start_date is invalid" doc:name="Assert Equals"/>
+        <munit:assert-on-equals expectedValue="4" actualValue="#[xpath3('invoicing_option', flowVars.acctRowNode)]" message="invoicing_option is invalid" doc:name="Assert Equals"/>
+        <munit:assert-on-equals expectedValue="#[]" actualValue="#[xpath3('status_cd', flowVars.acctRowNode, 'NODE')]" message="status_cd is invalid" doc:name="Assert Equals"/>
+        <munit:assert-on-equals expectedValue="#[]" actualValue="#[xpath3('alt_start_date', flowVars.acctRowNode, 'NODE')]" message="alt_start_date is invalid" doc:name="Assert Equals"/>
+
+
+        <set-variable variableName="planInstanceFieldsNode" value="#[xpath3('master_plans_detail/master_plans_detail_row/plan_instance_fields_info', flowVars.acctRowNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-on-equals expectedValue="#[]" actualValue="#[xpath3('plan_instance_fields_info_row[field_name = &quot;ADMIN_DESTINATION&quot;]', flowVars.planInstanceFieldsNode, 'NODE')]" message="ADMIN_DESTINATION should not be in output when value is blank" doc:name="Assert Equals"/>
+        <munit:assert-on-equals expectedValue="32123.0" actualValue="#[xpath3('plan_instance_fields_info_row[field_name = &quot;BILL_TO_ADDRESS_IDS&quot;]/field_value', flowVars.planInstanceFieldsNode)]" message="BILL_TO_ADDRESS_IDS is invalid" doc:name="Assert Equals"/>
+        <munit:assert-on-equals expectedValue="3M" actualValue="#[xpath3('plan_instance_fields_info_row[field_name = &quot;CONTRACT_CUSTOMER&quot;]/field_value', flowVars.planInstanceFieldsNode)]" message="CONTRACT_CUSTOMER is invalid" doc:name="Assert Equals"/>
+        <munit:assert-on-equals expectedValue="1 Main St City MN 55555" actualValue="#[xpath3('plan_instance_fields_info_row[field_name = &quot;CONTRACT_CUSTOMER_ADDRESS&quot;]/field_value', flowVars.planInstanceFieldsNode)]" message="CONTRACT_CUSTOMER_ADDRESS is invalid" doc:name="Assert Equals"/>
+        <munit:assert-on-equals expectedValue="John Doe" actualValue="#[xpath3('plan_instance_fields_info_row[field_name = &quot;CONTRACT_CUSTOMER_CONTACT&quot;]/field_value', flowVars.planInstanceFieldsNode)]" message="CONTRACT_CUSTOMER_CONTACT is invalid" doc:name="Assert Equals"/>
+        <munit:assert-on-equals expectedValue="5.0" actualValue="#[xpath3('plan_instance_fields_info_row[field_name = &quot;CONTRACT_TERM&quot;]/field_value', flowVars.planInstanceFieldsNode)]" message="CONTRACT_TERM is invalid" doc:name="Assert Equals"/>
+        <munit:assert-on-equals expectedValue="VDR; SecureExcelViewer" actualValue="#[xpath3('plan_instance_fields_info_row[field_name = &quot;CURRENT_ENTITLEMENT&quot;]/field_value', flowVars.planInstanceFieldsNode)]" message="CURRENT_ENTITLEMENT is invalid" doc:name="Assert Equals"/>
+        <munit:assert-on-equals expectedValue="Datasite-Asset Sale" actualValue="#[xpath3('plan_instance_fields_info_row[field_name = &quot;PRODUCT_TYPE&quot;]/field_value', flowVars.planInstanceFieldsNode)]" message="PRODUCT_TYPE is invalid" doc:name="Assert Equals"/>
+        <munit:assert-on-equals expectedValue="2017-03-06" actualValue="#[xpath3('plan_instance_fields_info_row[field_name = &quot;PROJECT_CREATION_DATE&quot;]/field_value', flowVars.planInstanceFieldsNode)]" message="PROJECT_CREATION_DATE is invalid" doc:name="Assert Equals"/>
+        <munit:assert-on-equals expectedValue="STP" actualValue="#[xpath3('plan_instance_fields_info_row[field_name = &quot;REVENUE_SITE&quot;]/field_value', flowVars.planInstanceFieldsNode)]" message="REVENUE_SITE is invalid" doc:name="Assert Equals"/>
+
+
+        <set-variable variableName="suppFieldsNode" value="#[xpath3('supp_field', flowVars.acctRowNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-on-equals expectedValue="a2dS0000000QsSERX0" actualValue="#[xpath3('supp_field_row[supp_field_name = &quot;SFDC_ID&quot;]/supp_field_value', flowVars.suppFieldsNode)]" message="SFDC_ID is invalid" doc:name="Assert Equals"/>
+        <munit:assert-on-equals expectedValue="VAT-Testing" actualValue="#[xpath3('supp_field_row[supp_field_name = &quot;VAT_REGISTRATION_NO&quot;]/supp_field_value', flowVars.suppFieldsNode)]" message="VAT_REGISTRATION_NO is invalid" doc:name="Assert Equals"/>
+        <munit:assert-on-equals expectedValue="#[]" actualValue="#[xpath3('supp_field_row[supp_field_name = &quot;PAN_TAX_NO&quot;]/supp_field_value', flowVars.suppFieldsNode, 'NODE')]" message="PAN_TAX_NO is invalid" doc:name="Assert Equals"/>
+        <munit:assert-on-equals expectedValue="32123.0" actualValue="#[xpath3('supp_field_row[supp_field_name = &quot;ORACLE_ID&quot;]/supp_field_value', flowVars.suppFieldsNode)]" message="ORACLE_ID is invalid" doc:name="Assert Equals"/>
+        <munit:assert-on-equals expectedValue="MERRILL COMMUNICATIONS LLC" actualValue="#[xpath3('supp_field_row[supp_field_name = &quot;LEGAL_ENTITY_NAME&quot;]/supp_field_value', flowVars.suppFieldsNode)]" message="LEGAL_ENTITY_NAME is invalid" doc:name="Assert Equals"/>
+-->
+    </munit:test>
+
+
+    <munit:test name="transformFormatsUpdateRowCorrectly_WhenOneSalesRepGivenThatIsMissingPrimary" description="MUnit Test">
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock Auth">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('getOracleAuthFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="{ }" mimeType="application/json">
+                <mock:invocation-properties>
+                    <mock:invocation-property key="oracleAuth" value="#[ ['tokenName': '', 'accessToken': ''] ]" mimeType="application/java"/>
+                </mock:invocation-properties>
+            </mock:then-return>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${aria.admintools.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('aria-entitlements-response.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${oracle.invoiceMapping.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('oracle-get-invoice-mapping.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+
+
+        <set-payload value="#[getResource('sfdc-query-response.json').asString()]" mimeType="application/json" doc:name="Variable" />
+        <json:json-to-object-transformer returnClass="java.util.HashMap" mimeType="application/java" doc:name="JSON to Object"/>
+        <set-variable value="#[payload]" variableName="theProject" mimeType="application/java" doc:name="Variable" />
+        <set-variable value="#[payload['companies'][0]]" variableName="theCompany" mimeType="application/java" doc:name="Variable" />
+        <set-variable variableName="ariaValues" value="#[ ['ariaAcct': '1234', 'ariaMPI': 'zxcv'] ]" mimeType="application/java" doc:name="Variable"/>
+        <set-variable variableName="salesReps" value="#[ [ ['name': 'John Doe', 'employeeNumber': 'abc123', 'splitPercentage': '20.0'] ] ]" mimeType="application/java" doc:name="Variable"/>
+
+        <set-variable variableName="ariaAcctDetails" value="#[getResource('dataweave-update-project/existing-project.xml').asString()]" doc:name="Variable"/>
+
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload resource="classpath:update-account.dwl"/>
+        </dw:transform-message>
+
+        <set-variable variableName="planMultiNode" value="#[xpath3('/soap:Envelope/soap:Body/aria:update_acct_plan_multi_m', payload, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.planMultiNode != empty]" message="planMultiNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="planUpdatesNode" value="#[xpath3('plan_updates/plan_updates_row', planMultiNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.planUpdatesNode != empty]" message="planUpdatesNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="masterPlanUpdatesNode" value="#[xpath3('plan_updates/plan_updates_row[string-length(existing_plan_instance_no/text()) > 0]', planMultiNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.masterPlanUpdatesNode != empty]" message="masterPlanUpdatesNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="planInstanceFieldNode" value="#[xpath3('plan_instance_field_update', flowVars.masterPlanUpdatesNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.planInstanceFieldNode != empty]" message="planInstanceFieldsNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="primaryRepIdNode" value="#[xpath3('plan_instance_field_update_row[plan_instance_field_name = &quot;PRIMARY_REP_ID&quot;]', flowVars.planInstanceFieldNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true message="primaryRepIdNode should not be empty" condition="#[flowVars.primaryRepIdNode != empty]" doc:name="Assert True"/>
+        <munit:assert-on-equals message="PRIMARY_REP_ID value is invalid" expectedValue="abc123" actualValue="#[xpath3('plan_instance_field_value', flowVars.primaryRepIdNode)]" doc:name="Assert Equals"/>
+
+    </munit:test>
+
+    <munit:test name="activeLabelEqualsLaunched_WhenBillingEffectiveDateIsNull" description="MUnit Test">
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock Auth">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('getOracleAuthFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="{ }" mimeType="application/json">
+                <mock:invocation-properties>
+                    <mock:invocation-property key="oracleAuth" value="#[ ['tokenName': '', 'accessToken': ''] ]" mimeType="application/java"/>
+                </mock:invocation-properties>
+            </mock:then-return>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${aria.admintools.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('aria-entitlements-response.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${oracle.invoiceMapping.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('oracle-get-invoice-mapping.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+
+
+        <set-payload value="#[getResource('sfdc-query-response.json').asString()]" mimeType="application/json" doc:name="Variable" />
+        <json:json-to-object-transformer returnClass="java.util.HashMap" mimeType="application/java" doc:name="JSON to Object"/>
+        <expression-component doc:name="Set EffectiveDate to Null">payload.billingEffectiveDate = null;</expression-component>
+
+        <set-variable value="#[payload]" variableName="theProject" mimeType="application/java" doc:name="Variable" />
+        <set-variable value="#[payload['companies'][0]]" variableName="theCompany" mimeType="application/java" doc:name="Variable" />
+        <set-variable variableName="ariaValues" value="#[ ['ariaAcct': '1234', 'ariaMPI': 'zxcv'] ]" mimeType="application/java" doc:name="Variable"/>
+        <set-variable variableName="salesReps" value="#[ [ ['name': 'John Doe', 'employeeNumber': 'abc123', 'splitPercentage': '20.0'] ] ]" mimeType="application/java" doc:name="Variable"/>
+
+        <set-variable variableName="ariaAcctDetails" value="#[getResource('dataweave-update-project/existing-project.xml').asString()]" doc:name="Variable"/>
+
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload resource="classpath:update-account.dwl"/>
+        </dw:transform-message>
+        <logger message="The transformed result: #[message.payloadAs(java.lang.String)]" level="INFO" doc:name="Logger"/>
+
+        <set-variable variableName="planMultiNode" value="#[xpath3('/soap:Envelope/soap:Body/aria:update_acct_plan_multi_m', payload, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.planMultiNode != empty]" message="planMultiNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="planUpdatesNode" value="#[xpath3('plan_updates/plan_updates_row', planMultiNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.planUpdatesNode != empty]" message="planUpdatesNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="masterPlanUpdatesNode" value="#[xpath3('plan_updates/plan_updates_row[string-length(existing_plan_instance_no/text()) > 0]', planMultiNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.masterPlanUpdatesNode != empty]" message="masterPlanUpdatesNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="planInstanceFieldNode" value="#[xpath3('plan_instance_field_update', flowVars.masterPlanUpdatesNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.planInstanceFieldNode != empty]" message="planInstanceFieldsNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="activeLabelNode" value="#[xpath3('plan_instance_field_update_row[plan_instance_field_name = &quot;ACTIVE_LABEL&quot;]', flowVars.planInstanceFieldNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-on-equals message="ACTIVE_LABEL value is invalid" expectedValue="Launched" actualValue="#[xpath3('plan_instance_field_value', flowVars.activeLabelNode)]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="ACTIVE_LABEL directive is invalid" expectedValue="2" actualValue="#[xpath3('plan_instance_field_directive', flowVars.activeLabelNode)]" doc:name="Assert Equals"/>
+    </munit:test>
+
+    <munit:test name="activeLabelEqualsEffective_WhenBillingEffectiveDateIsBeforeActiveDate" description="MUnit Test">
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock Auth">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('getOracleAuthFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="{ }" mimeType="application/json">
+                <mock:invocation-properties>
+                    <mock:invocation-property key="oracleAuth" value="#[ ['tokenName': '', 'accessToken': ''] ]" mimeType="application/java"/>
+                </mock:invocation-properties>
+            </mock:then-return>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${aria.admintools.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('aria-entitlements-response.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${oracle.invoiceMapping.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('oracle-get-invoice-mapping.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+
+
+        <set-payload value="#[getResource('sfdc-query-response.json').asString()]" mimeType="application/json" doc:name="Variable" />
+        <json:json-to-object-transformer returnClass="java.util.HashMap" mimeType="application/java" doc:name="JSON to Object"/>
+        <expression-component doc:name="Set ActiveDate"><![CDATA[payload.activeDate = '2017-01-03';]]></expression-component>
+        <expression-component doc:name="Set EffectiveDate">payload.billingEffectiveDate = '2017-01-02';</expression-component>
+
+        <set-variable value="#[payload]" variableName="theProject" mimeType="application/java" doc:name="Variable" />
+        <set-variable value="#[payload['companies'][0]]" variableName="theCompany" mimeType="application/java" doc:name="Variable" />
+        <set-variable variableName="ariaValues" value="#[ ['ariaAcct': '1234', 'ariaMPI': 'zxcv'] ]" mimeType="application/java" doc:name="Variable"/>
+        <set-variable variableName="salesReps" value="#[ [ ['name': 'John Doe', 'employeeNumber': 'abc123', 'splitPercentage': '20.0'] ] ]" mimeType="application/java" doc:name="Variable"/>
+
+        <set-variable variableName="ariaAcctDetails" value="#[getResource('dataweave-update-project/existing-project.xml').asString()]" doc:name="Variable"/>
+
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload resource="classpath:update-account.dwl"/>
+        </dw:transform-message>
+        <logger message="The transformed result: #[message.payloadAs(java.lang.String)]" level="INFO" doc:name="Logger"/>
+
+        <set-variable variableName="planMultiNode" value="#[xpath3('/soap:Envelope/soap:Body/aria:update_acct_plan_multi_m', payload, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.planMultiNode != empty]" message="planMultiNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="planUpdatesNode" value="#[xpath3('plan_updates/plan_updates_row', planMultiNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.planUpdatesNode != empty]" message="planUpdatesNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="masterPlanUpdatesNode" value="#[xpath3('plan_updates/plan_updates_row[string-length(existing_plan_instance_no/text()) > 0]', planMultiNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.masterPlanUpdatesNode != empty]" message="masterPlanUpdatesNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="planInstanceFieldNode" value="#[xpath3('plan_instance_field_update', flowVars.masterPlanUpdatesNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.planInstanceFieldNode != empty]" message="planInstanceFieldsNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="activeLabelNode" value="#[xpath3('plan_instance_field_update_row[plan_instance_field_name = &quot;ACTIVE_LABEL&quot;]', flowVars.planInstanceFieldNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-on-equals message="ACTIVE_LABEL value is invalid" expectedValue="Effective" actualValue="#[xpath3('plan_instance_field_value', flowVars.activeLabelNode)]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="ACTIVE_LABEL directive is invalid" expectedValue="2" actualValue="#[xpath3('plan_instance_field_directive', flowVars.activeLabelNode)]" doc:name="Assert Equals"/>
+    </munit:test>
+
+    <munit:test name="contractMinimumEqualsZero_WhenMinimumFeeDoesNotHaveValue" description="MUnit Test">
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock Auth">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('getOracleAuthFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="{ }" mimeType="application/json">
+                <mock:invocation-properties>
+                    <mock:invocation-property key="oracleAuth" value="#[ ['tokenName': '', 'accessToken': ''] ]" mimeType="application/java"/>
+                </mock:invocation-properties>
+            </mock:then-return>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${aria.admintools.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('aria-entitlements-response.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${oracle.invoiceMapping.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('oracle-get-invoice-mapping.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+
+
+        <set-payload value="#[getResource('sfdc-query-response.json').asString()]" mimeType="application/json" doc:name="Variable" />
+        <json:json-to-object-transformer returnClass="java.util.HashMap" mimeType="application/java" doc:name="JSON to Object"/>
+        <expression-component doc:name="Set MinimumFee"><![CDATA[payload.minimumFee = null;]]></expression-component>
+
+        <set-variable value="#[payload]" variableName="theProject" mimeType="application/java" doc:name="Variable" />
+        <set-variable value="#[payload['companies'][0]]" variableName="theCompany" mimeType="application/java" doc:name="Variable" />
+        <set-variable variableName="ariaValues" value="#[ ['ariaAcct': '1234', 'ariaMPI': 'zxcv'] ]" mimeType="application/java" doc:name="Variable"/>
+        <set-variable variableName="salesReps" value="#[ [ ['name': 'John Doe', 'employeeNumber': 'abc123', 'splitPercentage': '20.0'] ] ]" mimeType="application/java" doc:name="Variable"/>
+
+        <set-variable variableName="ariaAcctDetails" value="#[getResource('dataweave-update-project/existing-project.xml').asString()]" doc:name="Variable"/>
+
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload resource="classpath:update-account.dwl"/>
+        </dw:transform-message>
+
+        <set-variable variableName="planMultiNode" value="#[xpath3('/soap:Envelope/soap:Body/aria:update_acct_plan_multi_m', payload, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.planMultiNode != empty]" message="planMultiNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="planUpdatesNode" value="#[xpath3('plan_updates/plan_updates_row', planMultiNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.planUpdatesNode != empty]" message="planUpdatesNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="masterPlanUpdatesNode" value="#[xpath3('plan_updates/plan_updates_row[string-length(existing_plan_instance_no/text()) > 0]', planMultiNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.masterPlanUpdatesNode != empty]" message="masterPlanUpdatesNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="planInstanceFieldNode" value="#[xpath3('plan_instance_field_update', flowVars.masterPlanUpdatesNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.planInstanceFieldNode != empty]" message="planInstanceFieldsNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="contractMinimumNode" value="#[xpath3('plan_instance_field_update_row[plan_instance_field_name = &quot;PROCESSED_FOR_CONTRACT_MINIMUM&quot;]', flowVars.planInstanceFieldNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-on-equals message="PROCESSED_FOR_CONTRACT_MINIMUM value is invalid" expectedValue="1" actualValue="#[xpath3('plan_instance_field_value', flowVars.contractMinimumNode)]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="PROCESSED_FOR_CONTRACT_MINIMUM directive is invalid" expectedValue="2" actualValue="#[xpath3('plan_instance_field_directive', flowVars.contractMinimumNode)]" doc:name="Assert Equals"/>
+    </munit:test>
+
+    <munit:test name="contractMinimumEqualsOne_WhenMinimumFeeHasValue" description="MUnit Test">
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock Auth">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('getOracleAuthFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="{ }" mimeType="application/json">
+                <mock:invocation-properties>
+                    <mock:invocation-property key="oracleAuth" value="#[ ['tokenName': '', 'accessToken': ''] ]" mimeType="application/java"/>
+                </mock:invocation-properties>
+            </mock:then-return>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${aria.admintools.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('aria-entitlements-response.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${oracle.invoiceMapping.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('oracle-get-invoice-mapping.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+
+
+        <set-payload value="#[getResource('sfdc-query-response.json').asString()]" mimeType="application/json" doc:name="Variable" />
+        <json:json-to-object-transformer returnClass="java.util.HashMap" mimeType="application/java" doc:name="JSON to Object"/>
+        <expression-component doc:name="Set MinimumFee"><![CDATA[payload.minimumFee = '1';]]></expression-component>
+
+        <set-variable value="#[payload]" variableName="theProject" mimeType="application/java" doc:name="Variable" />
+        <set-variable value="#[payload['companies'][0]]" variableName="theCompany" mimeType="application/java" doc:name="Variable" />
+        <set-variable variableName="ariaValues" value="#[ ['ariaAcct': '1234', 'ariaMPI': 'zxcv'] ]" mimeType="application/java" doc:name="Variable"/>
+        <set-variable variableName="salesReps" value="#[ [ ['name': 'John Doe', 'employeeNumber': 'abc123', 'splitPercentage': '20.0'] ] ]" mimeType="application/java" doc:name="Variable"/>
+
+        <set-variable variableName="ariaAcctDetails" value="#[getResource('dataweave-update-project/existing-project.xml').asString()]" doc:name="Variable"/>
+
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload resource="classpath:update-account.dwl"/>
+        </dw:transform-message>
+
+        <set-variable variableName="planMultiNode" value="#[xpath3('/soap:Envelope/soap:Body/aria:update_acct_plan_multi_m', payload, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.planMultiNode != empty]" message="planMultiNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="planUpdatesNode" value="#[xpath3('plan_updates/plan_updates_row', planMultiNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.planUpdatesNode != empty]" message="planUpdatesNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="masterPlanUpdatesNode" value="#[xpath3('plan_updates/plan_updates_row[string-length(existing_plan_instance_no/text()) > 0]', planMultiNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.masterPlanUpdatesNode != empty]" message="masterPlanUpdatesNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="planInstanceFieldNode" value="#[xpath3('plan_instance_field_update', flowVars.masterPlanUpdatesNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.planInstanceFieldNode != empty]" message="planInstanceFieldsNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="contractMinimumNode" value="#[xpath3('plan_instance_field_update_row[plan_instance_field_name = &quot;PROCESSED_FOR_CONTRACT_MINIMUM&quot;]', flowVars.planInstanceFieldNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-on-equals message="PROCESSED_FOR_CONTRACT_MINIMUM value is invalid" expectedValue="0" actualValue="#[xpath3('plan_instance_field_value', flowVars.contractMinimumNode)]" doc:name="Assert Equals"/>
+        <munit:assert-on-equals message="PROCESSED_FOR_CONTRACT_MINIMUM directive is invalid" expectedValue="2" actualValue="#[xpath3('plan_instance_field_directive', flowVars.contractMinimumNode)]" doc:name="Assert Equals"/>
+    </munit:test>
+
+    <munit:test name="historicalEffectiveDateRemainsTheSameWhenBillingEffectiveDateIsNull" description="MUnit Test">
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock Auth">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('getOracleAuthFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="{ }" mimeType="application/json">
+                <mock:invocation-properties>
+                    <mock:invocation-property key="oracleAuth" value="#[ ['tokenName': '', 'accessToken': ''] ]" mimeType="application/java"/>
+                </mock:invocation-properties>
+            </mock:then-return>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${aria.admintools.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('dataweave-update-project/aria-entitlements-response.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${oracle.invoiceMapping.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('dataweave-update-project/oracle-get-invoice-mapping.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+
+
+        <set-payload value="#[getResource('sfdc-query-response.json').asString()]" mimeType="application/json" doc:name="Variable" />
+        <json:json-to-object-transformer returnClass="java.util.HashMap" mimeType="application/java" doc:name="JSON to Object"/>
+        <expression-component doc:name="Set MinimumFee"><![CDATA[payload.billingEffectiveDate = null;]]></expression-component>
+
+        <set-variable value="#[payload]" variableName="theProject" mimeType="application/java" doc:name="Variable" />
+        <set-variable value="#[payload['companies'][0]]" variableName="theCompany" mimeType="application/java" doc:name="Variable" />
+        <set-variable variableName="ariaValues" value="#[ ['ariaAcct': '1234', 'ariaMPI': 'zxcv'] ]" mimeType="application/java" doc:name="Variable"/>
+        <set-variable variableName="salesReps" value="#[ [ ['name': 'John Doe', 'employeeNumber': 'abc123', 'splitPercentage': '20.0'] ] ]" mimeType="application/java" doc:name="Variable"/>
+
+        <set-variable variableName="ariaAcctDetails" value="#[getResource('dataweave-update-project/historical-effective-date.xml').asString()]" doc:name="Variable"/>
+
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload resource="classpath:update-account.dwl"/>
+        </dw:transform-message>
+
+        <set-variable variableName="planMultiNode" value="#[xpath3('/soap:Envelope/soap:Body/aria:update_acct_plan_multi_m', payload, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.planMultiNode != empty]" message="planMultiNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="planUpdatesNode" value="#[xpath3('plan_updates/plan_updates_row', planMultiNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.planUpdatesNode != empty]" message="planUpdatesNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="masterPlanUpdatesNode" value="#[xpath3('plan_updates/plan_updates_row[string-length(existing_plan_instance_no/text()) > 0]', planMultiNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.masterPlanUpdatesNode != empty]" message="masterPlanUpdatesNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="planInstanceFieldNode" value="#[xpath3('plan_instance_field_update', flowVars.masterPlanUpdatesNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.planInstanceFieldNode != empty]" message="planInstanceFieldsNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="historicalEffectiveDateNode" value="#[xpath3('plan_instance_field_update_row[plan_instance_field_name = &quot;HISTORICAL_EFFECTIVE_DATE&quot;]', flowVars.planInstanceFieldNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.historicalEffectiveDateNode == empty]" message="historicalEffectiveDateNode should be empty" doc:name="Assert True"/>
+    </munit:test>
+<<<<<<< HEAD
+
+    <munit:test name="uploadedPlansAreZeroedOutWhenInContinuation" description="MUnit Test">
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock Auth">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('getOracleAuthFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="{ }" mimeType="application/json">
+                <mock:invocation-properties>
+                    <mock:invocation-property key="oracleAuth" value="#[ ['tokenName': '', 'accessToken': ''] ]" mimeType="application/java"/>
+                </mock:invocation-properties>
+            </mock:then-return>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${aria.admintools.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('dataweave-update-project/aria-entitlements-response.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${oracle.invoiceMapping.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('dataweave-update-project/oracle-get-invoice-mapping.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+
+
+        <set-payload value="#[getResource('sfdc-query-response.json').asString()]" mimeType="application/json" doc:name="Variable" />
+        <json:json-to-object-transformer returnClass="java.util.HashMap" mimeType="application/java" doc:name="JSON to Object"/>
+        <expression-component doc:name="Set ContinuationDate">payload.continuationDate = '2017-01-01';</expression-component>
+
+        <set-variable value="#[payload]" variableName="theProject" mimeType="application/java" doc:name="Variable" />
+        <set-variable value="#[payload['companies'][0]]" variableName="theCompany" mimeType="application/java" doc:name="Variable" />
+        <set-variable variableName="ariaValues" value="#[ ['ariaAcct': '1839607', 'ariaMPI': '2573742'] ]" mimeType="application/java" doc:name="Variable"/>
+        <set-variable variableName="salesReps" value="#[ [ ['name': 'John Doe', 'employeeNumber': 'abc123', 'splitPercentage': '20.0'] ] ]" mimeType="application/java" doc:name="Variable"/>
+
+        <set-variable variableName="ariaAcctDetails" value="#[getResource('dataweave-update-project/historical-effective-date.xml').asString()]" doc:name="Variable"/>
+
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload resource="classpath:update-account.dwl"/>
+        </dw:transform-message>
+
+        <set-variable variableName="planMultiNode" value="#[xpath3('/soap:Envelope/soap:Body/aria:update_acct_plan_multi_m', payload, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.planMultiNode != empty]" message="planMultiNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="mbsUploadedNode" value="#[xpath3('plan_updates/plan_updates_row[existing_client_plan_instance_id = &quot;2573764&quot;]', planMultiNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.mbsUploadedNode != empty]" message="mbsUploadedNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="mbsRatePerUnit" value="#[xpath3('custom_rates/custom_rates_row/custom_rate_per_unit', flowVars.mbsUploadedNode)]" doc:name="Variable"/>
+        <munit:assert-on-equals message="mbsRatePerUnit is invalid" expectedValue="0" actualValue="#[flowVars.mbsRatePerUnit]" doc:name="Assert True"/>
+
+    </munit:test>
+
+    <munit:test name="hostingLabelsDirectiveIsSetCorrectly" description="MUnit Test">
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock Auth">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('getOracleAuthFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="{ }" mimeType="application/json">
+                <mock:invocation-properties>
+                    <mock:invocation-property key="oracleAuth" value="#[ ['tokenName': '', 'accessToken': ''] ]" mimeType="application/java"/>
+                </mock:invocation-properties>
+            </mock:then-return>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${aria.admintools.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('dataweave-update-project/aria-entitlements-response.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="path" whereValue="${oracle.invoiceMapping.path}"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('dataweave-update-project/oracle-get-invoice-mapping.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+
+
+        <set-payload value="#[getResource('sfdc-query-response.json').asString()]" mimeType="application/json" doc:name="Variable" />
+        <json:json-to-object-transformer returnClass="java.util.HashMap" mimeType="application/java" doc:name="JSON to Object"/>
+        <expression-component doc:name="Set ContinuationDate">payload.continuationDate = '2017-01-01';</expression-component>
+
+        <set-variable value="#[payload]" variableName="theProject" mimeType="application/java" doc:name="Variable" />
+        <set-variable value="#[payload['companies'][0]]" variableName="theCompany" mimeType="application/java" doc:name="Variable" />
+        <set-variable variableName="ariaValues" value="#[ ['ariaAcct': '1846731', 'ariaMPI': '2589805'] ]" mimeType="application/java" doc:name="Variable"/>
+        <set-variable variableName="salesReps" value="#[ [ ['name': 'John Doe', 'employeeNumber': 'abc123', 'splitPercentage': '20.0'] ] ]" mimeType="application/java" doc:name="Variable"/>
+
+        <set-variable variableName="ariaAcctDetails" value="#[getResource('dataweave-update-project/hostingLabel.xml').asString()]" doc:name="Variable"/>
+
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload resource="classpath:update-account.dwl"/>
+        </dw:transform-message>
+
+        <set-variable variableName="planMultiNode" value="#[xpath3('/soap:Envelope/soap:Body/aria:update_acct_plan_multi_m', payload, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.planMultiNode != empty]" message="planMultiNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="planNode" value="#[xpath3('plan_updates/plan_updates_row[existing_client_plan_instance_id = &quot;2589807&quot;]', planMultiNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.planNode != empty]" message="planNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="hostingLabelNode" value="#[xpath3('plan_instance_field_update/plan_instance_field_update_row[plan_instance_field_name = &quot;HOSTING_LABEL&quot;]', flowVars.planNode, 'NODE')]" doc:name="Variable"/>
+        <munit:assert-true condition="#[flowVars.hostingLabelNode != empty]" message="hostingLabelNode should not be empty" doc:name="Assert True"/>
+
+        <set-variable variableName="hostingLabel" value="#[xpath3('plan_instance_field_directive', flowVars.hostingLabelNode)]" doc:name="Variable"/>
+        <munit:assert-on-equals message="hostingLabel is invalid" expectedValue="2" actualValue="#[flowVars.hostingLabel]" doc:name="Assert True"/>
+
+    </munit:test>
+=======
+>>>>>>> parent of 55f2c59... QTC-647 When in continuation, set the upload plans to be "zeroed" out.
+</mule>

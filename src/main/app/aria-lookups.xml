@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+	xmlns:json="http://www.mulesoft.org/schema/mule/json"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+xmlns="http://www.mulesoft.org/schema/mule/core"
+xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+xmlns:spring="http://www.springframework.org/schema/beans"
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:schemaLocation="http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+
+    <flow name="getAriaEntitlementsFromTemplate" processingStrategy="synchronous">
+        <logger message="flow=#[flow.name] action=started projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <logger message="system=Aria method=get_plan_details_m action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <logger message="system=Aria method=get_plan_details_m action=request projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <http:request config-ref="ariaAdminToolsRequestConfiguration" path="${aria.admintools.path}" method="GET" doc:name="Aria">
+            <http:request-builder>
+                <http:query-param paramName="client_no" value="${aria.client_no}"/>
+                <http:query-param paramName="auth_key" value="${aria.auth_key}"/>
+                <http:query-param paramName="rest_call" value="get_plan_details_m"/>
+                <http:query-param paramName="output_format" value="json"/>
+                <http:query-param paramName="client_plan_id" value="DataSite"/>
+                <http:query-param paramName="include_rs_summary" value="true"/>
+            </http:request-builder>
+        </http:request>
+        <logger message="system=Aria method=get_plan_details_m action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        <logger message="system=Aria method=get_plan_details_m action=response projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId] payload=#[message.payloadAs(java.lang.String)]" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <logger message="flow=#[flow.name] action=completed projectId=#[flowVars.projectId] invocationId=#[flowVars.invocationId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+    </flow>
+
+</mule>

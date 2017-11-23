@@ -1,0 +1,44 @@
+[
+  {
+    "EntityTypeKey": "ORG",
+
+    "IdentifierTypeKey": "SF_BILLADDR",
+    "IdentifierValue": "a3hc0000000FBy4AAG",
+
+    "Qualifier1Key": "OPERUNIT",
+    "Qualifier1Value": "US_OU-MERRILL CORPORATION"
+  },
+  {
+    "EntityTypeKey": "ORG",
+
+    "IdentifierTypeKey": "SF_BILLCO",
+    "IdentifierValue": "a3ic0000000jnxsAAA",
+
+    "Qualifier1Key": "VAT",
+    "Qualifier1Value": null
+  },
+  {
+    "EntityTypeKey": "ORG",
+
+    "IdentifierTypeKey": "Aria_Acct",
+    "IdentifierValue": "1704915",
+
+    "Qualifier1Key": "CURRENCY",
+    "Qualifier1Value": "USD",
+
+    "Qualifier2Key": "LEGALENT",
+    "Qualifier2Value": "010 - MERRILL COMMUNICATIONS LLC"
+  },
+  {
+    "EntityTypeKey": "ORG",
+
+    "IdentifierTypeKey": "Aria_Acct",
+    "IdentifierValue": "12345678",
+
+    "Qualifier1Key": "CURRENCY",
+    "Qualifier1Value": "EUR",
+
+    "Qualifier2Key": "LEGALENT",
+    "Qualifier2Value": "010 - MERRILL COMMUNICATIONS LLC"
+  }
+]

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:schedulers="http://www.mulesoft.org/schema/mule/schedulers" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting"
+      xmlns:json="http://www.mulesoft.org/schema/mule/json"
+      xmlns:vm="http://www.mulesoft.org/schema/mule/vm"
+      xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+      xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:spring="http://www.springframework.org/schema/beans"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/schedulers http://www.mulesoft.org/schema/mule/schedulers/current/mule-schedulers.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+
+    <flow name="processNewlyActiveProject" processingStrategy="synchronous">
+        <logger message="flow=#[flow.name] action=started" level="INFO" category="com.merrillcorp.q2c" doc:name="Log Initial Payload"/>
+        <json:json-to-object-transformer returnClass="java.lang.Object" doc:name="JSON to Object"/>
+
+        <set-variable variableName="theProject" value="#[payload]" doc:name="Set theProject flow Variable"/>
+        <set-variable variableName="transactionId" value="#[flowVars.theProject.projectSfdcId]" doc:name="Set transactionId Flow Variable"/>
+
+        <foreach collection="flowVars.theProject.companies" doc:name="For Each">
+
+            <set-variable variableName="theCompany" value="#[payload]" doc:name="Set theProject flow Variable"/>
+            <set-variable variableName="subTransactionId" value="#[payload['sfdcId']]" doc:name="Variable"/>
+
+            <enricher target="variable:upsertSfdcProjResponse" doc:name="Message Enricher">
+                <flow-ref name="getXRefForSFDCProjectFlow" doc:name="getXRefForSFDCProjectFlow"/>
+            </enricher>
+
+            <enricher target="variable:upsertOrgResponse" doc:name="Message Enricher">
+                <flow-ref name="getXRefForOrgFlow" doc:name="getXRefForOrgFlow"/>
+            </enricher>
+
+            <enricher target="variable:ariaValues" doc:name="Message Enricher">
+                <flow-ref name="matchAriaValues" doc:name="matchAriaValues"/>
+            </enricher>
+
+            <choice doc:name="Choice">
+                <when expression="#[flowVars.ariaValues.ariaMPI != empty]">
+                    <flow-ref name="ariaUpdateAcctPlanStatus" doc:name="ariaUpdateAcctPlanStatus"/>
+                </when>
+                <otherwise>
+                    <logger message="******* NOT KNOWN WHAT TO DO HERE projectId=#[flowVars.projectId]" level="WARN" category="com.merrillcorp.q2c" doc:name="Logger"/>
+                </otherwise>
+            </choice>
+        </foreach>
+
+        <logger message="flow=#[flow.name] action=completed" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="exception='#[exception.getSummaryMessage()]' projectId=#[flowVars.projectId]" level="ERROR" category="com.merrillcorp.q2c" doc:name="Log Exception Summary"/>
+        </catch-exception-strategy>
+    </flow>
+
+</mule>

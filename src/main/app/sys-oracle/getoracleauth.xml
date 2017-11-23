@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+    <flow name="GET_ORACLE_AUTH" processingStrategy="synchronous">
+        <vm:inbound-endpoint exchange-pattern="request-response" path="VM_GET_ORACLE_AUTH" connector-ref="VM_IN_MEMORY" doc:name="VM_GET_ORACLE_AUTH"/>
+        <ee:cache cachingStrategy-ref="ExpirableCachingStrategy" doc:name="Cache">
+            <until-successful maxRetries="${oracle.http.max.retries}" millisBetweenRetries="${oracle.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful">
+                <http:request config-ref="oracleRequestConfiguration" path="/webservices/rest/login" method="GET" doc:name="Oracle Get Auth Token"/>
+            </until-successful>
+            <dw:transform-message doc:name="Transform to Oracle Auth Response">
+                <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+{
+  accessToken: payload.data.accessToken,
+  tokenName: payload.data.accessTokenName
+}]]></dw:set-payload>
+            </dw:transform-message>
+            <json:object-to-json-transformer mimeType="application/json" doc:name="Object to JSON"/>
+        </ee:cache>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="#[exception.getSummaryMessage()]" level="ERROR" category="GET_ORACLE_AUTH" doc:name="Log Exception"/>
+        </catch-exception-strategy>
+    </flow>
+</mule>

@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:core="http://www.mulesoft.org/schema/mule/core" xmlns:mock="http://www.mulesoft.org/schema/mule/mock" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/mock http://www.mulesoft.org/schema/mule/mock/current/mule-mock.xsd">
+    <munit:config name="munit" doc:name="MUnit configuration"/>
+    <spring:beans>
+        <spring:import resource="classpath:projects.xml"/>
+        <spring:import resource="classpath:aria.xml"/>
+        <spring:import resource="classpath:dso.xml"/>
+        <spring:import resource="classpath:dso-auth.xml"/>
+        <spring:import resource="classpath:sfdc.xml"/>
+        <spring:import resource="classpath:sfdc-lookups.xml"/>
+        <spring:import resource="classpath:error-handling.xml"/>
+        <spring:import resource="classpath:oracle.xml"/>
+        <spring:import resource="classpath:oracle-auth.xml"/>
+        <spring:import resource="classpath:oracle-lookups.xml"/>
+        <spring:import resource="classpath:mdr-xrefs.xml"/>
+        <spring:import resource="classpath:mdr-upserts.xml"/>
+        <spring:import resource="classpath:globals.xml"/>
+    </spring:beans>
+
+    <munit:test name="doNotSetEndDate_WhenFoundAndNoChanges" description="Test">
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('upsert')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[]"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('create')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[]"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('persist')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[]"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('update')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[]"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('add')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[]"/>
+        </mock:when>
+
+        <mock:when messageProcessor="http:request" doc:name="Mock SFDC">
+            <mock:with-attributes>
+                <mock:with-attribute name="config-ref" whereValue="sfdcSystemRequestConfiguration"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('sfdc-query-response.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock Aria">
+            <mock:with-attributes>
+                <mock:with-attribute name="config-ref" whereValue="AriaSystemRequestConfiguration"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[ ['accountNumber': 'abc123', 'planInstanceNumber': 'abc123'] ]"/>
+        </mock:when>
+
+        <munit:set payload="#[getResource('billing-company-change/mdr-upsert-project-response.json').asString()]" mimeType="application/json" doc:name="Set Message"/>
+        <set-payload value="#[dw('payload', 'application/java')]"/>
+        <mock:when messageProcessor="mule:flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="getXRefForSFDCProjectFlow"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[payload]" mimeType="application/json"/>
+        </mock:when>
+
+        <munit:set payload="#[getResource('billing-company-change/mdr-upsert-project-response.json').asString()]" mimeType="application/json" doc:name="Set Message"/>
+        <set-payload value="#[dw('payload', 'application/java')]"/>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('upsertPROJ:SF_PROJ')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[payload]" mimeType="application/json"/>
+        </mock:when>
+
+        <munit:set payload="#[getResource('billing-company-change/mdr-upsert-org-no-change-response.json').asString()]" mimeType="application/json" doc:name="Set Message"/>
+        <set-payload value="#[dw('payload', 'application/java')]"/>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('upsertORG:SF_BILLCO')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[payload]"/>
+        </mock:when>
+
+        <munit:set payload="#[getResource('sfdc-query-response.json').asString()]" mimeType="application/json" doc:name="Set Message"/>
+        <set-variable variableName="theProject" value="#[dw('payload', 'application/java')]"/>
+
+        <munit:set payload="#[getResource('billing-company-change/mdr-upsert-project-response.json').asString()]" mimeType="application/json" doc:name="Set Message"/>
+        <set-variable variableName="upsertSfdcProjResponse" value="#[dw('payload', 'application/java')]"/>
+
+        <flow-ref name="projectProcessFlow" doc:name="projectProcessFlow"/>
+
+    </munit:test>
+</mule>

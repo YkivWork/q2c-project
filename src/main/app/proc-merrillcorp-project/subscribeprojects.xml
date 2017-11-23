@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:microsoftservicebus="http://www.mulesoft.org/schema/mule/microsoftservicebus" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/microsoftservicebus http://www.mulesoft.org/schema/mule/microsoftservicebus/current/mule-microsoftservicebus.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd">
+    <flow name="subscribeNewlyActiveProject" processingStrategy="synchronous">
+        <microsoftservicebus:queue-receive config-ref="Microsoft_Service_Bus__Azure_Service_Bus" sourceQueue="${queue.newlyactiveproject}" doc:name="Microsoft Service Bus (Streaming)"/>
+        <logger message="Flow: #[flow.name] Action=Started " level="INFO" category="mrll.project.subscribe" doc:name="Log Flow Start"/>
+        <vm:outbound-endpoint exchange-pattern="request-response" path="VM_EXTRACT_SERVICE_BUS_BODY" connector-ref="VM_IN_MEMORY" doc:name="Extract Service Bus Body"/>
+        <logger message="Flow: #[flow.name] Action=LogPayload Payload=#[message.payloadAs(java.lang.String)]" level="INFO" category="mrll.project.subscribe" doc:name="Log Project Payload"/>
+        <flow-ref name="processNewlyActiveProject" doc:name="processNewlyActiveProject"/>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="Flow: #[flow.name] Action=LogExceptionSummary Exception=#[exception.getSummaryMessage()]" level="ERROR" category="mrll.project.subscribe" doc:name="Log Exception Summary"/>
+        </catch-exception-strategy>
+    </flow>
+    <flow name="subscribeProjectSuspendedLast2Days" processingStrategy="synchronous">
+        <microsoftservicebus:queue-receive config-ref="Microsoft_Service_Bus__Azure_Service_Bus" sourceQueue="${queue.projectsuspendedlast2days}" doc:name="Microsoft Service Bus (Streaming)"/>
+        <logger message="Flow: #[flow.name] action=Started" level="INFO" category="mrll.project.queue.subscribe" doc:name="Log Flow Start"/>
+        <flow-ref name="extractAzureServiceBusBody" doc:name="extractAzureServiceBusBody"/>
+        <logger message="Flow: #[flow.name] Action=ExtractMessageBody Payload=#[message.payloadAs(java.lang.String)]" level="INFO" doc:name="Log Message Body" category="mrll.project.queue.subscribe"/>
+        <flow-ref name="processProjectSuspendedLast2Days" doc:name="processProjectSuspendedLast2Days"/>
+
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger level="ERROR" doc:name="Log Exception Summary" category="mrll.project.queue.subscribe" message="Flow: #[flow.name] Action=LogExceptionSummary ExceptionSummary=#[exception.getSummaryMessage()]"/>
+        </catch-exception-strategy>
+    </flow>
+    <flow name="subscribeProjectSuspendedYesterday" processingStrategy="synchronous">
+        <microsoftservicebus:queue-receive config-ref="Microsoft_Service_Bus__Azure_Service_Bus" sourceQueue="${queue.projectsuspendedyesterday}" doc:name="Microsoft Service Bus (Streaming)"/>
+        <logger message="Flow: #[flow.name] Action=Started" level="INFO" category="mrll.project.queue.subscribe" doc:name="Log Flow Start"/>
+        <flow-ref name="extractAzureServiceBusBody" doc:name="extractAzureServiceBusBody"/>
+        <logger message="Flow: #[flow.name] Action=ExtractMessageBody Payload=#[message.payloadAs(java.lang.String)]" level="INFO" category="mrll.project.queue.subscribe" doc:name="Log Message Body"/>
+        <flow-ref name="processProjectSuspendedYesterday" doc:name="processProjectSuspendedYesterday"/>
+
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="Flow: #[flow.name] Action=LogExceptionSummary ExceptionSummary=#[exception.getSummaryMessage()]" level="ERROR" category="mrll.project.queue.subscribe" doc:name="Log Exception Summary"/>
+        </catch-exception-strategy>
+    </flow>
+</mule>

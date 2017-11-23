@@ -1,0 +1,19 @@
+{
+    "applicationProperties": {},
+    "header": {
+        "durable": true,
+        "priority": 4,
+        "ttl": null,
+        "deliveryCount": 0
+    },
+    "properties": {
+        "messageId": "848dc7d3-022f-483c-a7c1-e0837c6792fa",
+        "contentType": null,
+        "correlationId": null,
+        "to": "/merrillprojects",
+        "replyTo": null,
+        "userId": null,
+        "subject": null
+    },
+    "body": ""
+}

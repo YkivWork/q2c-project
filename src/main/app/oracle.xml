@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+
+    <sub-flow name="persistInOracleFlow">
+        <flow-ref name="getOracleAuthFlow" doc:name="getOracleAuthFlow"/>
+        <flow-ref name="getXRefForSFDCProjectFlow" doc:name="getXRefForSFDCProjectFlow"/>
+
+        <dw:transform-message doc:name="Find oracle project">
+            <dw:set-variable variableName="needsOracleUpdate"><![CDATA[%dw 1.0
+%output application/java
+
+%var oraProjFound = flowVars.upsertSfdcProjResponse[?( $.IdentifierTypeKey == 'ORA_Proj' and $.EntityTypeKey == 'PROJ' )][0]
+
+---
+true when oraProjFound != null otherwise false
+]]></dw:set-variable>
+        </dw:transform-message>
+
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.needsOracleUpdate]">
+                <flow-ref name="updateInOracleFlow" doc:name="updateInOracleFlow"/>
+            </when>
+            <otherwise>
+                <flow-ref name="createInOracleFlow" doc:name="createInOracleFlow"/>
+                <flow-ref name="createOracleProjectAndSFDC_XRef" doc:name="createOracleProjectAndSFDC_XRef"/>
+            </otherwise>
+        </choice>
+    </sub-flow>
+
+    <sub-flow name="createOracleProjectAndSFDC_XRef">
+        <dw:transform-message doc:name="Prepare Payload for Storing XRef">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/json
+---
+{
+  entity_type_key: "PROJ",
+  on_id_type_key: "SF_PROJ",
+  on_id_value: flowVars.theProject.projectSfdcId,
+
+  add_id_type_key: "ORA_Proj",
+  add_id_value: payload.oracle_project_number
+}]]></dw:set-payload>
+        </dw:transform-message>
+
+        <!--
+        TODO This flow needs to be in mdr-xrefs
+        -->
+        <logger message="system=MDR method=OracleXRef action=request projectId=#[flowVars.projectId]" category="com.merrillcorp.q2c" level="INFO" doc:name="Logger"/>
+        <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="setPayloadBeforeUntilSuccess"/>
+        <until-successful maxRetries="${mdr.http.max.retries}" synchronous="true" doc:name="Until Successful" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" millisBetweenRetries="${mdr.http.milliSecondsBetweenRetries}">
+            <http:request config-ref="mdrSystemRequestConfiguration" path="${mdr.crossref.path}" method="POST" doc:name="Post MDR XRef"/>
+        </until-successful>
+        <logger message="system=MDR method=OracleXRef action=response projectId=#[flowVars.projectId]" category="com.merrillcorp.q2c" level="INFO" doc:name="Logger"/>
+
+    </sub-flow>
+
+    <sub-flow name="createInOracleFlow">
+        <logger message="flow=createInOracleFlow action=started projectId=#[flowVars.projectId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+
+        <flow-ref name="GET_PROJECT_ORGANIZATION_ID" doc:name="GET_PROJECT_ORGANIZATION_ID"/>
+
+        <dw:transform-message doc:name="Prepare Payload for Project Creation">
+			<dw:set-payload resource="classpath:dataweave/prepareCreateProjectInOracle.dwl"/>
+        </dw:transform-message>
+
+        <logger message="system=Oracle method=CreateProject action=request projectId=#[flowVars.projectId]" category="com.merrillcorp.q2c" level="INFO" doc:name="Logger"/>
+        <set-session-variable variableName="payloadBeforeUntilSuccess" value="#[payload]" doc:name="setPayloadBeforeUntilSuccess"/>
+        <until-successful maxRetries="${oracle.http.max.retries}" synchronous="true" doc:name="Until Successful" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" millisBetweenRetries="${oracle.http.milliSecondsBetweenRetries}">
+            <http:request config-ref="oracleRequestConfiguration" path="${oracle.project.path}" method="POST" doc:name="CreateProject">
+                <http:request-builder>
+                    <http:header headerName="Cookie" value="#[flowVars.oracleAuth.tokenName + '=' + flowVars.oracleAuth.accessToken]"/>
+                </http:request-builder>
+                <!-- This masked an error and the transforms failed later on. I'm commenting this out until we can get code around failures. Too many things to do -->
+                <!-- <http:success-status-code-validator values="0..599"/> -->
+            </http:request>
+        </until-successful>
+        <logger message="system=Oracle method=CreateProject action=request projectId=#[flowVars.projectId]" category="com.merrillcorp.q2c" level="INFO" doc:name="Logger"/>
+
+        <dw:transform-message doc:name="Parse Project Creation Result">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+{
+  oracle_project_number : payload.OutputParameters.P_RESULTS.PROJECT_NUMBER,
+  status : payload.OutputParameters.P_RESULTS.STATUS,
+  message : payload.OutputParameters.P_RESULTS.MESSAGES.MESSAGES_ITEM
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <choice doc:name="Choice">
+            <when expression="#[payload.status == 'S']">
+                <logger message="The response status == 'S'" level="DEBUG" category="com.merrillcorp.q2c" doc:name="Logger"/>
+            </when>
+            <otherwise>
+                <logger message="The response status != 'S', stopping the execution of createInOracleFlow." level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+        <filter ref="Oracle_Response_Evaluation" doc:name="Oracle_Response_Evaluation"/>
+
+        <logger message="flow=createInOracleFlow action=completed projectId=#[flowVars.projectId]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+    </sub-flow>
+
+    <sub-flow name="updateInOracleFlow">
+        <logger message="Update Oracle - THIS IS NOT CREATED YET!!!!!!!!!!!!!!!!!!!!!!!!!!! projectId=#[flowVars.projectId]" level="WARN" category="com.merrillcorp.q2c" doc:name="Logger"/>
+    </sub-flow>
+</mule>

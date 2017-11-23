@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+    xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+    xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+    xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+
+
+    <sub-flow name="lookupSalesRepFlow">
+        <logger message="Looking up sales rep for #[flowVars.theProject.projectSfdcId]" level="INFO" doc:name="Logger"/>
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT Id,
+Is_Primary__c,
+SplitPercentage,
+SplitOwnerId
+FROM OpportunitySplit
+WHERE OpportunityId in (SELECT Opportunity__c FROM DatasiteOne_Project__c where Id = '#[flowVars.theProject.projectSfdcId]')" doc:name="Salesforce OpportunitySplit"/>
+<!--
+Down below in the final transform, a "filter" is used in DW. If you do not consume the ConsumingIterator returned from sfdc,
+then the filter works only on the first one and nothing else. Hence for these transforms.
+-->
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+ isPrimary: $.Is_Primary__c,
+ splitPercentage: $.SplitPercentage,
+ ownerId: $.SplitOwnerId
+}
+]]></dw:set-payload>
+        </dw:transform-message>
+        <set-variable variableName="opportunitySplits" value="#[payload]" doc:name="Variable"/>
+
+<!--
+I hate this, would love other's input on how to make it better. I can use map and joinBy, but it doesn't look much better
+Ultimately, how can I send in an array for SFDC's "in" predicate expression.
+-->
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="userIds"><![CDATA[%dw 1.0
+%output application/java
+---
+payload map ( "'" ++ $.ownerId ++ "'" ) joinBy ","
+]]></dw:set-variable>
+        </dw:transform-message>
+
+        <logger message="Looking up SalesReps: #[flowVars.userIds]" level="INFO" category="com.merrillcorp.q2c" doc:name="Logger"/>
+        
+        <sfdc:query config-ref="Salesforce__Basic_Authentication" query="SELECT EmployeeNumber,Name,Id FROM User WHERE Id in (#[flowVars.userIds])" doc:name="Salesforce OpportunitySplit"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload map {
+ name: $.Name,
+ id: $.Id,
+ employeeNumber: $.EmployeeNumber
+}
+]]></dw:set-payload>
+        </dw:transform-message>
+        <set-variable variableName="users" value="#[payload]" doc:name="Variable"/>
+
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.opportunitySplits map
+  using (ownerId = $.ownerId)
+  using(theUser = (flowVars.users filter $.id == ownerId)[0])
+{
+  isPrimary: $.isPrimary,
+  splitPercentage: $.splitPercentage,
+  employeeNumber: theUser.employeeNumber,
+  name: theUser.name
+}
+]]></dw:set-payload>
+        </dw:transform-message>
+
+        <logger message="Done Looking up sales rep. #[message.payloadAs(java.lang.String)]" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+</mule>

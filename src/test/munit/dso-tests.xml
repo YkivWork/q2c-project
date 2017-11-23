@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:core="http://www.mulesoft.org/schema/mule/core" xmlns:mock="http://www.mulesoft.org/schema/mule/mock" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/mock http://www.mulesoft.org/schema/mule/mock/current/mule-mock.xsd">
+    <munit:config name="munit" doc:name="MUnit configuration"/>
+    <spring:beans>
+        <spring:import resource="classpath:dso.xml"/>
+        <spring:import resource="classpath:dso-auth.xml"/>
+        <spring:import resource="classpath:aria.xml"/>
+        <spring:import resource="classpath:sfdc-lookups.xml"/>
+        <spring:import resource="classpath:oracle.xml"/>
+        <spring:import resource="classpath:oracle-auth.xml"/>
+        <spring:import resource="classpath:oracle-lookups.xml"/>
+        <spring:import resource="classpath:mdr-xrefs.xml"/>
+        <spring:import resource="classpath:mdr-upserts.xml"/>
+        <spring:import resource="classpath:error-handling.xml"/>
+        <spring:import resource="classpath:globals.xml"/>
+    </spring:beans>
+    <munit:test name="persistInDSOFlow_Cond1" description="Test" >
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="config-ref" whereValue="mdrSystemRequestConfiguration"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('mdr-getcrossreference-response-nothing.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('createInDSOFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="{&quot;id&quot; : &quot;a_project_from_ds1&quot;}" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock updateInDSOFlow">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('updateInDSOFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="{&quot;Status&quot; : &quot;S&quot;}" mimeType="application/json"/>
+        </mock:when>
+        <set-variable variableName="theProject" value="{ &quot;projectSfdcId&quot; :  &quot;SF1&quot;, &quot;datasiteOneId&quot;: &quot;DS1&quot; }" mimeType="application/json" doc:name="Variable"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="theProject"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.theProject]]></dw:set-variable>
+        </dw:transform-message>
+        <set-variable variableName="MDRCrossReferences" value="#[getResource('mdr-getcrossreference-response.json').asString()]" mimeType="application/json" doc:name="MDRCrossReferences"/>
+        <dw:transform-message doc:name="Set upsertSfdcProjResponse">
+            <dw:set-variable variableName="upsertSfdcProjResponse"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.MDRCrossReferences]]></dw:set-variable>
+        </dw:transform-message>
+        <flow-ref name="persistInDSOFlow" doc:name="persistInDSOFlow"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <munit:assert-true message="Cond1-{DSOXREF Y, DSOPROJ Y}-failed" condition="#[(flowVars.varDSOXrefExistsFlag == true) &amp;&amp; (varSfdcDSOProjectID != empty)]" doc:name="Assert True"/>
+    </munit:test>
+    <munit:test name="persistInDSOFlow_Cond2" description="Test" >
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock CreateInDSOFlow">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('createInDSOFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="{&quot;id&quot; : &quot;a_project_from_ds1&quot;}" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock createDSOXRefs">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('createDSOXRefs')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('mdr-getcrossreference-response.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+
+        <set-variable variableName="theProject" value="{ &quot;projectSfdcId&quot; :  &quot;SF1&quot;, &quot;datasiteOneId&quot;: &quot;&quot;}" mimeType="application/json" doc:name="Variable"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="theProject"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.theProject]]></dw:set-variable>
+        </dw:transform-message>
+        <set-variable variableName="MDRCrossReferences" value="#[getResource('mdr-getcrossreference-response-nothing.json').asString()]" mimeType="application/json" doc:name="MDRCrossReferences"/>
+        <dw:transform-message doc:name="Set upsertSfdcProjResponse">
+            <dw:set-variable variableName="upsertSfdcProjResponse"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.MDRCrossReferences]]></dw:set-variable>
+        </dw:transform-message>
+        <flow-ref name="persistInDSOFlow" doc:name="persistInDSOFlow"/>
+         <munit:assert-true message="Cond2-{DSOXREF N, DSOPROJ N}-failed" condition="#[(flowVars.varDSOXrefExistsFlag == false) &amp;&amp; (flowVars.varSfdcDSOProjectID == empty)]" doc:name="Assert True"/>
+        <!-- <munit:assert-false message="update flag is wrong" condition="#[flowVars.varDSOXrefExistsFlag]" doc:name="Assert False"/>  -->
+    </munit:test>
+    <munit:test name="persistInDSOFlow_Cond3" description="MUnit Test">
+        <mock:when messageProcessor="http:request" doc:name="Mock_MDR">
+            <mock:with-attributes>
+                <mock:with-attribute name="config-ref" whereValue="mdrSystemRequestConfiguration"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('mdr-getcrossreference-response-nothing.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock UpdateInDSOFlow">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('updateInDSOFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="{&quot;id&quot; : &quot;a_project_from_ds1&quot;}" mimeType="application/json"/>
+        </mock:when>
+          
+        <set-variable variableName="theProject" value="{ &quot;projectSfdcId&quot; :  &quot;SF1&quot;, &quot;datasiteOneId&quot;: &quot;DS1&quot;}" mimeType="application/json" doc:name="Variable"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="theProject"><![CDATA[%dw 1.0
+%output application/java
+---
+flowVars.theProject]]></dw:set-variable>
+        </dw:transform-message>
+        <flow-ref name="persistInDSOFlow" doc:name="persistInDSOFlow"/>
+        <munit:assert-true message="Cond3-{DSOXREF N, DSOPROJ Y}-failed" condition="#[(flowVars.varDSOXrefExistsFlag ==false) &amp;&amp; (varSfdcDSOProjectID != empty)]" doc:name="Assert True"/>
+    </munit:test>
+    <munit:test name="createDSOXRefsTest" description="Test">
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="config-ref" whereValue="mdrSystemRequestConfiguration"/>
+            </mock:with-attributes>
+            <mock:then-return payload="{ &quot;status&quot;  : &quot;S&quot;}" mimeType="application/json"/>
+        </mock:when>
+        <set-variable variableName="theProject" value="#[getResource('sfdc-query-response.json').asString()]" mimeType="application/json" doc:name="Variable"/>
+        <flow-ref name="createDSOXRefs" doc:name="createDSOXRefs"/>
+        <set-payload value="#[dw(payload, 'application/java')]" doc:name="Set Payload"/>
+        <munit:assert-on-equals message="status is invalid" expectedValue="S" actualValue="#[payload['status']]" doc:name="Assert Equals"/>
+    </munit:test>
+    <munit:test name="createInDSOFlowFormatsRequestCorrectly" description="Test">
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('createORG:ORA_ACCT')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[]" mimeType="application/java"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('getDSOAuth_Sub_Flow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[samePayload()]" mimeType="application/json">
+                <mock:invocation-properties>
+                    <mock:invocation-property key="dsoToken" value="the security token"/>
+                </mock:invocation-properties>
+            </mock:then-return>
+        </mock:when>
+        <mock:when messageProcessor=".*:.*" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="doc:name" whereValue="#['Salesforce']"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('sfdc-update-response.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="Mock">
+            <mock:then-return payload="#[getResource('dso-response.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+        <mock:spy messageProcessor="http:request" doc:name="Spy on DSO System">
+            <mock:with-attributes>
+                <mock:with-attribute name="config-ref" whereValue="dsoApiRequestConfiguration"/>
+            </mock:with-attributes>
+            <mock:assertions-before-call>
+                <set-variable variableName="payloadAsMap" value="#[dw(payload, 'application/java')]" doc:name="Variable"/>
+                <munit:assert-on-equals message="name is invalid" expectedValue="Some Project Name" actualValue="#[flowVars.payloadAsMap['info']['name']]" doc:name="Assert Equals"/>
+                <munit:assert-on-equals message="externalId is invalid" expectedValue="some-ref-id" actualValue="#[flowVars.payloadAsMap['info']['externalId']]" doc:name="Assert Equals"/>
+            </mock:assertions-before-call>
+        </mock:spy>
+        <munit:set payload="#[ [] ]" doc:name="Set Message">
+            <munit:invocation-properties>
+                <munit:invocation-property key="theProject" value="#[ ['name': 'Some Project Name', 'projectSfdcId': 'some-ref-id'] ]"/>
+            </munit:invocation-properties>
+        </munit:set>
+        <flow-ref name="createInDSOFlow" doc:name="createInDSOFlow"/>
+    </munit:test>
+    <munit:test name="dso-createProjectExtend" description="MUnit Test">
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('parseAriaCurrentEntitlementAndStateForMPIFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[ 'qwer;asdf;zxcv' ]" mimeType="application/java"/>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="DSO Token Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="config-ref" whereValue="dsoAuthRequestConfiguration"/>
+            </mock:with-attributes>
+            <mock:then-return payload="{&quot;access_token&quot;: &quot;eyJhbGciOiJIUzI1NiIsImtpZCI6IjEifQ.eyJzdWIiOiJzdmNfc2ZfaWFtX2xkYXBAYWRtaW5zeXMubXJsbC5jb20iLCJBVCI6InRlc3QiLCJVc2VyTmFtZSI6InN2Y19zZl9pYW1fbGRhcEBhZG1pbnN5cy5tcmxsLmNvbSIsIkZpcnN0TmFtZSI6IlRlc3QgVXNlciIsImdyb3VwIjoic2FsZXNmb3JjZV9zZXJ2aWNlIiwiZXhwIjoxNDkzMjY1NDQ5LCJzY29wZSI6W10sImNsaWVudF9pZCI6ImlhbV9hcGlfc2YiLCJpc3MiOiJpYW0ubWVycmlsbGNvcnAuY29tIiwiYXVkIjoiamF2ZWxpbm1jLmNvbSJ9.LhuIEpUU5C2kUKkMhb0H6XokKmCSgKKK8oILSSTYo_I&quot;,&quot;token_type&quot;: &quot;Bearer&quot;,&quot;expires_in&quot;: 36119}" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor="http:request" doc:name="DSO Project Creation Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="config-ref" whereValue="dsoApiRequestConfiguration"/>
+            </mock:with-attributes>
+            <mock:then-return payload="{ &quot;id&quot; : &quot;58e521834417550013dcd940&quot; }" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('createPROJ:DS1_PROJ')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="good" mimeType="application/java"/>
+        </mock:when>
+        <mock:when messageProcessor="sfdc:update" doc:name="Mock">
+            <mock:then-return payload="#[ [] ]" mimeType="application/json"/>
+        </mock:when>
+        <set-variable variableName="sfdcData" value="{ &quot;active_date__c&quot; : &quot;2017-04-05&quot; }" mimeType="application/json" doc:name="Variable"/>
+        <set-payload value="{ &quot;name&quot; : &quot;DatasiteOne Test Project&quot;,   &quot;projectSfdcId&quot;: &quot;a27S0000000jCFUIA2&quot; }" mimeType="application/json" doc:name="Set Payload"/>
+        <set-variable variableName="theProject" value="#[dw(payload, 'application/java')]" doc:name="Variable"/>
+        <flow-ref name="createInDSOFlow" doc:name="createInDSOFlow"/>
+        <set-payload value="#[dw(payload, 'application/java')]" doc:name="Set Payload"/>
+        <munit:assert-on-equals message="createProjectExtend Test failed" expectedValue="58e521834417550013dcd940" actualValue="#[flowVars.DSOCreateProjectResponse.id ]" doc:name="Assert Equals"/>
+    </munit:test>
+    <munit:test name="dso-tests-updateInDSOFlowTest" description="Test">
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock parseAriaCurrentEntitlementAndStateForMPIFlow">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('parseAriaCurrentEntitlementAndStateForMPIFlow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[dw('{ errorMessage: &quot;msg&quot;, errorCode: &quot;101&quot;, entitlements: &quot;VDR; SecureExcelViewer&quot;, state: &quot;projectPhase&quot;}', 'application/java')]" mimeType="text/plain"/>
+        </mock:when>
+
+        <mock:when messageProcessor="http:request" doc:name="DSO Project update Mock">
+            <mock:with-attributes>
+                <mock:with-attribute name="config-ref" whereValue="dsoApiRequestConfiguration"/>
+            </mock:with-attributes>
+            <mock:then-return payload="#[getResource('dso-update-entitlement-response-example.json').asString()]" mimeType="application/json"/>
+        </mock:when>
+        <mock:when messageProcessor="mule:sub-flow" doc:name="Mock getDSOAuth_Sub_Flow">
+            <mock:with-attributes>
+                <mock:with-attribute name="name" whereValue="#[matchContains('getDSOAuth_Sub_Flow')]"/>
+            </mock:with-attributes>
+            <mock:then-return payload="{}" mimeType="application/json"/>
+        </mock:when>
+        <set-payload value="#[getResource('mdr-getcrossreference-response.json').asString()]" mimeType="application/json" doc:name="Set Payload"/> 
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="upsertSfdcProjResponse"><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-variable>
+        </dw:transform-message>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="ariaValues"><![CDATA[%dw 1.0
+%output application/java
+---
+{
+  ariaAcct: "1139093"
+}]]></dw:set-variable>
+        </dw:transform-message>
+        <set-payload value="#[getResource('sfdc-query-response.json').asString()]" mimeType="application/json" doc:name="Set Payload"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-variable variableName="theProject"><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-variable>
+        </dw:transform-message>
+
+        <flow-ref name="updateInDSOFlow" doc:name="updateInDSOFlow"/>
+
+        <munit:assert-not-null message="return payload from DSO is empty" doc:name="Assert Not Null Payload "/>
+        <munit:assert-on-equals message="the number of entitlements is wrong on updateInDSOFlow" expectedValue="VDR; SecureExcelViewer" actualValue="#[flowVars.ariaResponse.entitlements]" doc:name="Assert Equals on size of Entitlements"/>
+        <munit:assert-on-equals message="dsoProjectId is wrong on updateInDSOFlow" expectedValue="5919dd8ac083b2001050a391" actualValue="#[flowVars.dsoProjectId]" doc:name="Assert Equals on dsoProjectId"/>
+    </munit:test>
+</mule>

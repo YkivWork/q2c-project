@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:json="http://www.mulesoft.org/schema/mule/json" xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/json http://www.mulesoft.org/schema/mule/json/current/mule-json.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd">
+    <flow name="GET_XREF_FOR_SFDC_PROJECT" processingStrategy="synchronous">
+        <vm:inbound-endpoint exchange-pattern="request-response" path="VM_GET_XREF_FOR_SFDC_PROJECT" connector-ref="VM_IN_MEMORY" doc:name="VM_GET_XREF_FOR_SFDC_PROJECT"/>
+        <logger message="Initial XREF For SFDC Project Request: #[payload]" level="DEBUG" category="GET_XREF_FOR_SFDC_PROJECT" doc:name="[DEBUG]Log Initial Payload"/>
+
+        <dw:transform-message doc:name="Transform to Java Object">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/java
+---
+payload]]></dw:set-payload>
+        </dw:transform-message>
+        <expression-component doc:name="Initialize Variables"><![CDATA[flowVars.projectSfdcId=payload.id_value;
+flowVars.entity_type_key=payload.entity_type_key;
+flowVars.id_type_key=payload.id_type_key;
+flowVars.include_deleted_cross_ref=payload.include_deleted_cross_ref;]]></expression-component>
+        <until-successful maxRetries="${mdr.http.max.retries}" millisBetweenRetries="${mdr.http.milliSecondsBetweenRetries}" failureExpression="exception!=null &amp;&amp; (exception.causedBy(java.io.IOException) || exception.causedBy(java.net.ConnectException)  || exception.causedBy(java.net.SocketTimeoutException))" synchronous="true" doc:name="Until Successful">
+            <http:request config-ref="mdrSystemRequestConfiguration" path="${mdr.crossref.path}" method="GET" doc:name="HTTP">
+                <http:request-builder>
+                    <http:query-param paramName="entity_type_key" value="#[flowVars.entity_type_key]"/>
+                    <http:query-param paramName="id_type_key" value="#[flowVars.id_type_key]"/>
+                    <http:query-param paramName="id_value" value="#[flowVars.projectSfdcId]"/>
+                    <http:query-param paramName="include_deleted_cross_ref" value="#[flowVars.include_deleted_cross_ref"/>
+                </http:request-builder>
+            </http:request>
+        </until-successful>
+        <json:object-to-json-transformer mimeType="application/json" doc:name="Object to JSON"/>        
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="#[exception.getSummaryMessage()]" level="ERROR" category="GET_XREF_FOR_SFDC_PROJECT" doc:name="Log Exception Summary"/>
+        </catch-exception-strategy>
+    </flow>
+</mule>
